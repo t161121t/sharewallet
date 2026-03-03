@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import ScreenContainer from "@/components/layout/ScreenContainer";
@@ -8,13 +8,16 @@ import PageTransition from "@/components/layout/PageTransition";
 import BottomNav from "@/components/layout/BottomNav";
 import RouteLoading from "@/components/layout/RouteLoading";
 import GroupBanner from "@/components/ui/GroupBanner";
+import GroupSwitcher from "@/components/ui/GroupSwitcher";
 import ExpensePieChart, { type ExpenseCategory } from "@/components/ui/ExpensePieChart";
 import GenreSelect from "@/components/ui/GenreSelect";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import type { Group, CategoryName, ExpenseRecord } from "@/types";
 import {
   isAuthenticated,
+  getGroups,
   getSelectedGroupId,
+  setSelectedGroupId,
   getGroup,
   getExpenses,
   createExpense,
@@ -50,11 +53,26 @@ export default function ExpensePage() {
   const router = useRouter();
   const [genre, setGenre] = useState("");
   const [amount, setAmount] = useState("");
+  const [memo, setMemo] = useState("");
   const [isReady, setIsReady] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [switchingGroup, setSwitchingGroup] = useState(false);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [selectedGroupId, setSelectedGroupIdState] = useState<string | null>(null);
   const [group, setGroup] = useState<Group | null>(null);
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const [shares, setShares] = useState<Record<string, string>>({});
+
+  const loadGroupData = useCallback(async (groupId: string) => {
+    const [groupData, expensesData] = await Promise.all([getGroup(groupId), getExpenses(groupId)]);
+    setGroup(groupData);
+    setExpenses(expensesData);
+    setSelectedGroupIdState(groupId);
+    const initial = Object.fromEntries(
+      groupData.members.map((m) => [m.id, (100 / groupData.members.length).toFixed(2)])
+    );
+    setShares(initial);
+  }, []);
 
   const pieData = useMemo<ExpenseCategory[]>(() => {
     const sumByCategory: Record<CategoryName, number> = {
@@ -83,27 +101,38 @@ export default function ExpensePage() {
       return;
     }
 
-    const groupId = getSelectedGroupId();
-    if (!groupId) {
-      router.replace("/dashboard");
-      return;
-    }
-
-    // API からグループ情報を取得
-    Promise.all([getGroup(groupId), getExpenses(groupId)])
-      .then(([groupData, expensesData]) => {
-        setGroup(groupData);
-        setExpenses(expensesData);
-        const initial = Object.fromEntries(
-          groupData.members.map((m) => [m.id, (100 / groupData.members.length).toFixed(2)])
-        );
-        setShares(initial);
+    getGroups()
+      .then(async (groupList) => {
+        setGroups(groupList);
+        if (groupList.length === 0) {
+          router.replace("/groups/new");
+          return;
+        }
+        const savedId = getSelectedGroupId();
+        const initialGroupId =
+          savedId && groupList.some((g) => g.id === savedId) ? savedId : groupList[0].id;
+        setSelectedGroupId(initialGroupId);
+        await loadGroupData(initialGroupId);
         setIsReady(true);
       })
       .catch(() => {
         router.replace("/dashboard");
       });
-  }, [router]);
+  }, [loadGroupData, router]);
+
+  const handleGroupChange = async (groupId: string) => {
+    if (!groupId || groupId === selectedGroupId) return;
+    setSwitchingGroup(true);
+    try {
+      setSelectedGroupId(groupId);
+      await loadGroupData(groupId);
+      toast.success("グループを切り替えました");
+    } catch {
+      toast.error("グループ切り替えに失敗しました");
+    } finally {
+      setSwitchingGroup(false);
+    }
+  };
 
   const handleRegister = async () => {
     if (!genre || !amount) {
@@ -126,13 +155,14 @@ export default function ExpensePage() {
       const created = await createExpense(group.id, {
         category: normalizeCategory(genre),
         amount: Number(amount),
-        memo: "",
+        memo: memo.trim() || undefined,
         shares: shareItems,
       });
       setExpenses((prev) => [created, ...prev]);
       toast.success("支出を登録しました");
       setGenre("");
       setAmount("");
+      setMemo("");
     } catch (e) {
       if (e instanceof ApiClientError) {
         toast.error(e.message);
@@ -158,6 +188,15 @@ export default function ExpensePage() {
         >
           Share Wallet
         </p>
+
+        {/* グループバナー */}
+        <GroupSwitcher
+          groups={groups}
+          selectedGroupId={selectedGroupId}
+          onChange={handleGroupChange}
+          disabled={switchingGroup}
+          className="mb-3"
+        />
 
         {/* グループバナー */}
         <div className="w-full">
@@ -200,6 +239,27 @@ export default function ExpensePage() {
                 "focus:ring-2 focus:ring-[#c9a227] focus:border-[#c9a227]",
               ].join(" ")}
               aria-label="使った金額を入力"
+            />
+          </label>
+
+          <label className="w-full">
+            <div className="text-base font-medium text-[#4a4540] dark:text-[#c5c0b8] mb-2">
+              メモ（任意）
+            </div>
+            <input
+              type="text"
+              placeholder="例: スーパーまとめ買い"
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              className={[
+                "w-full h-12 rounded-xl px-4 outline-none text-base",
+                "bg-white dark:bg-[#1c1b19] border border-[#e5e0d8] dark:border-[#333230]",
+                "text-[#2d2a26] dark:text-[#eae7e1]",
+                "placeholder:text-[#b5b0a8] dark:placeholder:text-[#666360]",
+                "transition-all duration-200 ease-out",
+                "focus:ring-2 focus:ring-[#c9a227] focus:border-[#c9a227]",
+              ].join(" ")}
+              aria-label="メモを入力"
             />
           </label>
 

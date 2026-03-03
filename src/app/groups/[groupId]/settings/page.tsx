@@ -1,21 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import ScreenContainer from "@/components/layout/ScreenContainer";
 import PageTransition from "@/components/layout/PageTransition";
 import BottomNav from "@/components/layout/BottomNav";
 import RouteLoading from "@/components/layout/RouteLoading";
+import GroupSwitcher from "@/components/ui/GroupSwitcher";
 import TextInput from "@/components/ui/TextInput";
 import PrimaryButton from "@/components/ui/PrimaryButton";
-import type { Group } from "@/types";
+import BudgetProgressPanel from "@/components/ui/BudgetProgressPanel";
+import type { Group, CategoryBudget, BudgetProgressResponse } from "@/types";
 import {
   ApiClientError,
   addMember,
   deleteGroup,
   getGroup,
+  getGroups,
+  setSelectedGroupId,
+  getCategoryBudgets,
+  getBudgetProgress,
   removeMember,
+  updateCategoryBudgets,
   updateGroup,
 } from "@/lib/apiClient";
 
@@ -25,28 +32,58 @@ export default function GroupSettingsPage() {
   const groupId = params.groupId;
 
   const [group, setGroup] = useState<Group | null>(null);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [name, setName] = useState("");
   const [color, setColor] = useState("#c9a227");
   const [inviteEmail, setInviteEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  const [budgets, setBudgets] = useState<CategoryBudget[]>([]);
+  const [budgetProgress, setBudgetProgress] = useState<BudgetProgressResponse | null>(null);
+  const [budgetLoading, setBudgetLoading] = useState(false);
+  const [budgetSaving, setBudgetSaving] = useState(false);
+
+  const getCurrentMonthKey = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, "0")}`;
+  };
+  const currentMonth = getCurrentMonthKey();
+
+  const loadBudgetData = useCallback(async () => {
+    setBudgetLoading(true);
+    try {
+      const [budgetsData, progressData] = await Promise.all([
+        getCategoryBudgets(groupId, currentMonth),
+        getBudgetProgress(groupId, currentMonth),
+      ]);
+      setBudgets(budgetsData);
+      setBudgetProgress(progressData);
+    } finally {
+      setBudgetLoading(false);
+    }
+  }, [currentMonth, groupId]);
 
   useEffect(() => {
-    getGroup(groupId)
+    Promise.all([getGroup(groupId), getGroups()])
       .then((g) => {
-        setGroup(g);
-        setName(g.name);
-        setColor(g.color);
+        const [groupData, groupList] = g;
+        setGroup(groupData);
+        setGroups(groupList);
+        setName(groupData.name);
+        setColor(groupData.color);
+        return loadBudgetData();
       })
       .catch(() => {
         router.replace("/dashboard");
       });
-  }, [groupId, router]);
+  }, [groupId, loadBudgetData, router]);
 
   const refresh = async () => {
-    const g = await getGroup(groupId);
+    const [g, list] = await Promise.all([getGroup(groupId), getGroups()]);
     setGroup(g);
+    setGroups(list);
     setName(g.name);
     setColor(g.color);
+    await loadBudgetData();
   };
 
   const handleSave = async () => {
@@ -96,6 +133,30 @@ export default function GroupSettingsPage() {
     }
   };
 
+  const handleSaveBudgets = async (items: CategoryBudget[]) => {
+    setBudgetSaving(true);
+    try {
+      const updated = await updateCategoryBudgets(groupId, {
+        month: currentMonth,
+        items,
+      });
+      setBudgets(updated);
+      const progressData = await getBudgetProgress(groupId, currentMonth);
+      setBudgetProgress(progressData);
+      toast.success("予算を保存しました");
+    } catch (e) {
+      toast.error(e instanceof ApiClientError ? e.message : "予算の保存に失敗しました");
+    } finally {
+      setBudgetSaving(false);
+    }
+  };
+
+  const handleSwitchGroup = (nextGroupId: string) => {
+    if (!nextGroupId || nextGroupId === groupId) return;
+    setSelectedGroupId(nextGroupId);
+    router.push(`/groups/${nextGroupId}/settings`);
+  };
+
   if (!group) return <RouteLoading text="グループ設定を読み込み中..." withBottomNav />;
 
   return (
@@ -111,6 +172,19 @@ export default function GroupSettingsPage() {
         <h1 className="text-2xl font-bold text-[#2d2a26] dark:text-[#eae7e1]">
           グループ設定
         </h1>
+        <GroupSwitcher
+          groups={groups}
+          selectedGroupId={groupId}
+          onChange={handleSwitchGroup}
+          className="mb-1"
+        />
+        <BudgetProgressPanel
+          budgets={budgets}
+          progress={budgetProgress}
+          loading={budgetLoading}
+          saving={budgetSaving}
+          onSave={handleSaveBudgets}
+        />
         <TextInput label="グループ名" value={name} onChange={setName} />
         <label className="w-full">
           <div className="text-base font-medium text-[#4a4540] dark:text-[#c5c0b8] mb-2">

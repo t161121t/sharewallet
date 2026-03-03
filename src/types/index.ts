@@ -64,6 +64,41 @@ export type ExpenseWithShares = {
   shares: ExpenseShare[];
 };
 
+export type DashboardSummaryResponse = {
+  totalAmount: number;
+  byGroup: {
+    groupId: string;
+    groupName: string;
+    groupColor: string;
+    amount: number;
+  }[];
+  byCategory: {
+    category: CategoryName;
+    amount: number;
+  }[];
+};
+
+export type CategoryBudget = {
+  category: CategoryName;
+  amount: number;
+};
+
+export type BudgetProgressItem = {
+  category: CategoryName;
+  budget: number;
+  spent: number;
+  remaining: number;
+  percent: number;
+  overBudget: boolean;
+};
+
+export type BudgetProgressResponse = {
+  month: string;
+  totalBudget: number;
+  totalSpent: number;
+  items: BudgetProgressItem[];
+};
+
 /** ログインレスポンス */
 export type LoginResponse = {
   token: string;

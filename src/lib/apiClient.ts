@@ -13,6 +13,9 @@ import type {
   ExpenseRecord,
   CategoryName,
   ExpenseShare,
+  DashboardSummaryResponse,
+  CategoryBudget,
+  BudgetProgressResponse,
 } from "@/types";
 
 /* ========== トークン管理 ========== */
@@ -232,6 +235,44 @@ export async function removeMember(
   return apiFetch<{ ok: boolean }>(`/api/groups/${groupId}/members/${userId}`, {
     method: "DELETE",
   });
+}
+
+/* ========== ダッシュボード API ========== */
+
+export async function getDashboardSummary(
+  period: "current-month" = "current-month"
+): Promise<DashboardSummaryResponse> {
+  return apiFetch<DashboardSummaryResponse>(
+    `/api/dashboard/summary?period=${period}`
+  );
+}
+
+export async function getCategoryBudgets(
+  groupId: string,
+  month?: string
+): Promise<CategoryBudget[]> {
+  const query = month ? `?month=${month}` : "";
+  return apiFetch<CategoryBudget[]>(`/api/groups/${groupId}/budgets${query}`);
+}
+
+export async function updateCategoryBudgets(
+  groupId: string,
+  input: { month?: string; items: CategoryBudget[] }
+): Promise<CategoryBudget[]> {
+  return apiFetch<CategoryBudget[]>(`/api/groups/${groupId}/budgets`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getBudgetProgress(
+  groupId: string,
+  month?: string
+): Promise<BudgetProgressResponse> {
+  const query = month ? `?month=${month}` : "";
+  return apiFetch<BudgetProgressResponse>(
+    `/api/groups/${groupId}/budgets/progress${query}`
+  );
 }
 
 /* ========== 支出 API ========== */

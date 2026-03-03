@@ -15,6 +15,14 @@ export default function NewGroupPage() {
   const [color, setColor] = useState("#c9a227");
   const [loading, setLoading] = useState(false);
 
+  const handleBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push("/expense");
+  };
+
   const handleCreate = async () => {
     if (!name.trim()) {
       toast.error("グループ名を入力してください");
@@ -40,6 +48,17 @@ export default function NewGroupPage() {
   return (
     <ScreenContainer>
       <PageTransition className="flex flex-col w-full gap-5">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="inline-flex w-fit items-center gap-1 text-sm font-medium text-[#7a756d] dark:text-[#9e9a93] hover:underline"
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" width={16} height={16}>
+            <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+          </svg>
+          戻る
+        </button>
+
         <h1 className="text-2xl font-bold text-[#2d2a26] dark:text-[#eae7e1]">
           グループ作成
         </h1>

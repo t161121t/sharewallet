@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
@@ -9,15 +9,28 @@ import PageTransition from "@/components/layout/PageTransition";
 import BottomNav from "@/components/layout/BottomNav";
 import RouteLoading from "@/components/layout/RouteLoading";
 import CategoryIcon from "@/components/icons/CategoryIcon";
-import type { Group, ExpenseRecord, CategoryName } from "@/types";
+import GroupSwitcher from "@/components/ui/GroupSwitcher";
+import BudgetProgressPanel from "@/components/ui/BudgetProgressPanel";
+import type {
+  Group,
+  ExpenseRecord,
+  CategoryName,
+  CategoryBudget,
+  BudgetProgressResponse,
+} from "@/types";
 import {
   isAuthenticated,
+  getGroups,
   getSelectedGroupId,
+  setSelectedGroupId,
   getGroup,
   getExpenses,
   getMe,
   updateExpense,
   deleteExpense,
+  getCategoryBudgets,
+  getBudgetProgress,
+  updateCategoryBudgets,
   ApiClientError,
 } from "@/lib/apiClient";
 
@@ -202,6 +215,9 @@ function ExpenseItem({
 export default function HistoryPage() {
   const router = useRouter();
   const [isReady, setIsReady] = useState(false);
+  const [isSwitchingGroup, setIsSwitchingGroup] = useState(false);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [selectedGroupId, setSelectedGroupIdState] = useState<string | null>(null);
   const [group, setGroup] = useState<Group | null>(null);
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const [editing, setEditing] = useState<ExpenseRecord | null>(null);
@@ -209,6 +225,40 @@ export default function HistoryPage() {
   const [editAmount, setEditAmount] = useState("");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [canManageAll, setCanManageAll] = useState(false);
+  const [budgets, setBudgets] = useState<CategoryBudget[]>([]);
+  const [budgetProgress, setBudgetProgress] = useState<BudgetProgressResponse | null>(null);
+  const [budgetLoading, setBudgetLoading] = useState(false);
+  const [budgetSaving, setBudgetSaving] = useState(false);
+
+  const getCurrentMonthKey = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, "0")}`;
+  };
+  const currentMonth = getCurrentMonthKey();
+
+  const loadBudgetData = useCallback(async (groupId: string) => {
+    setBudgetLoading(true);
+    try {
+      const [budgets, progress] = await Promise.all([
+        getCategoryBudgets(groupId, currentMonth),
+        getBudgetProgress(groupId, currentMonth),
+      ]);
+      setBudgets(budgets);
+      setBudgetProgress(progress);
+    } finally {
+      setBudgetLoading(false);
+    }
+  }, [currentMonth]);
+
+  const loadGroupData = useCallback(async (groupId: string, meId: string) => {
+    const [groupData, expensesData] = await Promise.all([getGroup(groupId), getExpenses(groupId)]);
+    setGroup(groupData);
+    setExpenses(expensesData);
+    setSelectedGroupIdState(groupId);
+    const myMember = groupData.members.find((m) => m.id === meId);
+    setCanManageAll(myMember?.role === "OWNER" || myMember?.role === "ADMIN");
+    await loadBudgetData(groupId);
+  }, [loadBudgetData]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -217,26 +267,39 @@ export default function HistoryPage() {
       return;
     }
 
-    const groupId = getSelectedGroupId();
-    if (!groupId) {
-      router.replace("/dashboard");
-      return;
-    }
-
-    // API からグループ情報と支出一覧を並行取得
-    Promise.all([getGroup(groupId), getExpenses(groupId), getMe()])
-      .then(([groupData, expensesData, me]) => {
-        setGroup(groupData);
-        setExpenses(expensesData);
+    Promise.all([getGroups(), getMe()])
+      .then(async ([groupList, me]) => {
+        setGroups(groupList);
         setCurrentUserId(me.id);
-        const myMember = groupData.members.find((m) => m.id === me.id);
-        setCanManageAll(myMember?.role === "OWNER" || myMember?.role === "ADMIN");
+        if (groupList.length === 0) {
+          router.replace("/groups/new");
+          return;
+        }
+        const savedId = getSelectedGroupId();
+        const initialGroupId =
+          savedId && groupList.some((g) => g.id === savedId) ? savedId : groupList[0].id;
+        setSelectedGroupId(initialGroupId);
+        await loadGroupData(initialGroupId, me.id);
         setIsReady(true);
       })
       .catch(() => {
         router.replace("/dashboard");
       });
-  }, [router]);
+  }, [loadGroupData, router]);
+
+  const handleGroupChange = async (groupId: string) => {
+    if (!groupId || groupId === selectedGroupId || !currentUserId) return;
+    setIsSwitchingGroup(true);
+    try {
+      setSelectedGroupId(groupId);
+      await loadGroupData(groupId, currentUserId);
+      toast.success("グループを切り替えました");
+    } catch {
+      toast.error("グループ切り替えに失敗しました");
+    } finally {
+      setIsSwitchingGroup(false);
+    }
+  };
 
   if (!isReady || !group) {
     return <RouteLoading text="履歴を読み込み中..." withBottomNav />;
@@ -282,6 +345,24 @@ export default function HistoryPage() {
     }
   };
 
+  const handleSaveBudgets = async (items: CategoryBudget[]) => {
+    setBudgetSaving(true);
+    try {
+      const updated = await updateCategoryBudgets(groupId, {
+        month: currentMonth,
+        items,
+      });
+      setBudgets(updated);
+      const progressData = await getBudgetProgress(groupId, currentMonth);
+      setBudgetProgress(progressData);
+      toast.success("予算を保存しました");
+    } catch (e) {
+      toast.error(e instanceof ApiClientError ? e.message : "予算の保存に失敗しました");
+    } finally {
+      setBudgetSaving(false);
+    }
+  };
+
   return (
     <ScreenContainer>
       <PageTransition className="flex flex-col w-full flex-1 pb-20">
@@ -291,6 +372,14 @@ export default function HistoryPage() {
         >
           Share Wallet
         </p>
+
+        <GroupSwitcher
+          groups={groups}
+          selectedGroupId={selectedGroupId}
+          onChange={handleGroupChange}
+          disabled={isSwitchingGroup}
+          className="mb-4"
+        />
 
         <div className="flex items-center gap-2 mb-4">
           <div className="w-8 h-8 rounded-full bg-[#c9a227] flex items-center justify-center shrink-0">
@@ -304,6 +393,14 @@ export default function HistoryPage() {
         </div>
 
         <SummaryCard expenses={expenses} group={group} />
+
+        <BudgetProgressPanel
+          budgets={budgets}
+          progress={budgetProgress}
+          loading={budgetLoading}
+          saving={budgetSaving}
+          onSave={handleSaveBudgets}
+        />
 
         <h2 className="text-lg font-bold text-[#2d2a26] dark:text-[#eae7e1] mt-6 mb-2">
           支出履歴
