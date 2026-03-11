@@ -4,6 +4,14 @@ import { prisma } from "@/lib/prisma";
 import { requireAuthUserId } from "@/lib/auth";
 import { GroupRole } from "@/generated/prisma/client";
 
+function isUnknownIconUrlError(e: unknown) {
+  return (
+    e instanceof Error &&
+    (e.message.includes("Unknown argument `iconUrl`") ||
+      e.message.includes("no such column: groups.icon_url"))
+  );
+}
+
 /** GET /api/groups - グループ一覧取得 */
 export async function GET(req: NextRequest) {
   try {
@@ -66,23 +74,45 @@ export async function POST(req: NextRequest) {
         : "#c9a227";
     const iconUrl = typeof body.iconUrl === "string" ? body.iconUrl : null;
 
-    const created = await prisma.group.create({
-      data: {
-        name: body.name.trim(),
-        color,
-        iconUrl,
-        members: {
-          create: [{ userId, role: GroupRole.OWNER }],
-        },
-      },
-      include: {
-        members: {
-          include: {
-            user: { select: { id: true, name: true, color: true, avatarUrl: true } },
+    let created;
+    try {
+      created = await prisma.group.create({
+        data: {
+          name: body.name.trim(),
+          color,
+          iconUrl,
+          members: {
+            create: [{ userId, role: GroupRole.OWNER }],
           },
         },
-      },
-    });
+        include: {
+          members: {
+            include: {
+              user: { select: { id: true, name: true, color: true, avatarUrl: true } },
+            },
+          },
+        },
+      });
+    } catch (e) {
+      // 古い Prisma Client / DB スキーマでもグループ作成が失敗しないようにフォールバック
+      if (!isUnknownIconUrlError(e)) throw e;
+      created = await prisma.group.create({
+        data: {
+          name: body.name.trim(),
+          color,
+          members: {
+            create: [{ userId, role: GroupRole.OWNER }],
+          },
+        },
+        include: {
+          members: {
+            include: {
+              user: { select: { id: true, name: true, color: true, avatarUrl: true } },
+            },
+          },
+        },
+      });
+    }
 
     const result: Group = {
       id: created.id,

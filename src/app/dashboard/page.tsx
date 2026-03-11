@@ -88,6 +88,7 @@ export default function DashboardPage() {
   const topGroup = summary?.byGroup[0] ?? null;
   const topCategory = summary?.byCategory[0] ?? null;
   const top3Groups = useMemo(() => summary?.byGroup.slice(0, 3) ?? [], [summary]);
+  const top3Categories = useMemo(() => summary?.byCategory.slice(0, 3) ?? [], [summary]);
   const groupMoMRate = useMemo(() => {
     if (!summary) return null;
     const prev = summary.previousMonthTotalPersonalAmount;
@@ -166,17 +167,42 @@ export default function DashboardPage() {
 
         {activeTab === "overview" && (
           <div className="w-full flex flex-col gap-3 mb-5">
-            <div className="rounded-2xl p-5 text-white shadow-lg bg-gradient-to-br from-[#d4a320] via-[#e8c547] to-[#c9a227]">
-              <p className="text-sm opacity-90">{summary?.period.label ?? "今月"}の個人合計</p>
-              <p className="text-3xl font-bold mt-1 tabular-nums">
-                {formatYen(summary?.totalPersonalAmount ?? 0)}
+            <div className="rounded-2xl p-5 text-white shadow-lg bg-gradient-to-br from-[#b78510] via-[#c9961a] to-[#a9780d]">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm opacity-90">{summary?.period.label ?? "今月"}の個人合計</p>
+                {groupMoMRate !== null && (
+                  <span
+                    className={[
+                      "text-[11px] px-2 py-0.5 rounded-full font-bold tabular-nums border border-white/30",
+                      groupMoMRate >= 0 ? "bg-[#7a1f1f]/35 text-white" : "bg-[#125443]/35 text-white",
+                    ].join(" ")}
+                  >
+                    先月比 {groupMoMRate >= 0 ? "+" : ""}
+                    {groupMoMRate.toFixed(1)}%
+                  </span>
+                )}
+              </div>
+              <p className="text-4xl font-extrabold mt-1 tabular-nums">
+                {formatYen(animatedGroupTotal)}
               </p>
-              <p className="text-xs mt-2 opacity-85">あなたが支払った支出の合計</p>
+              <p className="text-xs mt-2 opacity-90">あなたが支払った支出の合計</p>
+
+              <div className="mt-3 flex gap-2 flex-wrap">
+                {top3Groups.map((g, i) => (
+                  <span
+                    key={g.groupId}
+                    className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold bg-white/30 border border-white/40 text-[#2d2a26]"
+                  >
+                    G{i + 1}
+                    <span className="max-w-[100px] truncate">{g.groupName}</span>
+                  </span>
+                ))}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl border border-[#ece7de] dark:border-[#2f2d2a] bg-white/80 dark:bg-[#1c1b19]/80 p-4">
-                <p className="text-xs text-[#9e9a93] dark:text-[#77736d]">支出が多いグループ</p>
+              <div className="rounded-xl border border-[#dfd7c9] dark:border-[#3a3732] bg-white dark:bg-[#1f1d1a] p-4">
+                <p className="text-xs text-[#6f6a62] dark:text-[#b1aba2]">支出が多いグループ</p>
                 <p className="text-sm font-semibold text-[#2d2a26] dark:text-[#eae7e1] mt-1 truncate">
                   {topGroup?.groupName ?? "データなし"}
                 </p>
@@ -184,8 +210,8 @@ export default function DashboardPage() {
                   {formatYen(topGroup?.amount ?? 0)}
                 </p>
               </div>
-              <div className="rounded-xl border border-[#ece7de] dark:border-[#2f2d2a] bg-white/80 dark:bg-[#1c1b19]/80 p-4">
-                <p className="text-xs text-[#9e9a93] dark:text-[#77736d]">支出が多いジャンル</p>
+              <div className="rounded-xl border border-[#dfd7c9] dark:border-[#3a3732] bg-white dark:bg-[#1f1d1a] p-4">
+                <p className="text-xs text-[#6f6a62] dark:text-[#b1aba2]">支出が多いジャンル</p>
                 <p className="text-sm font-semibold text-[#2d2a26] dark:text-[#eae7e1] mt-1 truncate">
                   {topCategory?.category ?? "データなし"}
                 </p>
@@ -194,6 +220,28 @@ export default function DashboardPage() {
                 </p>
               </div>
             </div>
+
+            {top3Categories.length > 0 && (
+              <div className="rounded-xl border border-[#dfd7c9] dark:border-[#3a3732] bg-white dark:bg-[#1f1d1a] p-4">
+                <p className="text-xs text-[#6f6a62] dark:text-[#b1aba2] mb-2">TOP3ジャンル</p>
+                <div className="flex gap-2 flex-wrap">
+                  {top3Categories.map((c, i) => (
+                    <span
+                      key={c.category}
+                      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold border"
+                      style={{
+                        borderColor: lightBg(CATEGORY_COLORS[c.category] ?? "#94a3b8", 0.35),
+                        backgroundColor: lightBg(CATEGORY_COLORS[c.category] ?? "#94a3b8", 0.1),
+                        color: CATEGORY_COLORS[c.category] ?? "#94a3b8",
+                      }}
+                    >
+                      {i + 1}
+                      <span>{c.category}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

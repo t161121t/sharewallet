@@ -4,6 +4,14 @@ import { prisma } from "@/lib/prisma";
 import { requireAuthUserId, assertGroupMember, assertGroupRole } from "@/lib/auth";
 import { GroupRole } from "@/generated/prisma/client";
 
+function isUnknownIconUrlError(e: unknown) {
+  return (
+    e instanceof Error &&
+    (e.message.includes("Unknown argument `iconUrl`") ||
+      e.message.includes("no such column: groups.icon_url"))
+  );
+}
+
 /** GET /api/groups/[groupId] - グループ詳細取得 */
 export async function GET(
   req: NextRequest,
@@ -94,17 +102,35 @@ export async function PUT(
     } else if (typeof body.iconUrl === "string") {
       data.iconUrl = body.iconUrl;
     }
-    const group = await prisma.group.update({
-      where: { id: groupId },
-      data,
-      include: {
-        members: {
-          include: {
-            user: { select: { id: true, name: true, color: true, avatarUrl: true } },
+    let group;
+    try {
+      group = await prisma.group.update({
+        where: { id: groupId },
+        data,
+        include: {
+          members: {
+            include: {
+              user: { select: { id: true, name: true, color: true, avatarUrl: true } },
+            },
           },
         },
-      },
-    });
+      });
+    } catch (e) {
+      if (!isUnknownIconUrlError(e)) throw e;
+      const safeData = { ...data };
+      delete safeData.iconUrl;
+      group = await prisma.group.update({
+        where: { id: groupId },
+        data: safeData,
+        include: {
+          members: {
+            include: {
+              user: { select: { id: true, name: true, color: true, avatarUrl: true } },
+            },
+          },
+        },
+      });
+    }
 
     const result: Group = {
       id: group.id,
