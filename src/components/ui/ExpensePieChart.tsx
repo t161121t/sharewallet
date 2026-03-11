@@ -20,11 +20,12 @@ export type ExpenseCategory = {
 };
 
 const DEFAULT_DATA: ExpenseCategory[] = [
-  { name: "貯金", value: 30000, color: "#34a853" },
-  { name: "住居", value: 17400, color: "#e67e22" },
-  { name: "交通", value: 2100, color: "#3498db" },
-  { name: "食費", value: 13900, color: "#e74c3c" },
-  { name: "娯楽", value: 4500, color: "#9b59b6" },
+  { name: "食費", value: 13900, color: "#ef4444" },
+  { name: "貯金", value: 30000, color: "#22c55e" },
+  { name: "住居", value: 17400, color: "#f97316" },
+  { name: "交通", value: 2100, color: "#38bdf8" },
+  { name: "娯楽", value: 4500, color: "#8b5cf6" },
+  { name: "日用品", value: 3200, color: "#f59e0b" },
 ];
 
 /* ---------- 凡例 ---------- */

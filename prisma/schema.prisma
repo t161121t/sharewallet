@@ -37,6 +37,7 @@ model Group {
   id        String   @id @default(cuid())
   name      String
   color     String   @default("#c9a227")
+  iconUrl   String?  @map("icon_url")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

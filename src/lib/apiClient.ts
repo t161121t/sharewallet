@@ -13,6 +13,7 @@ import type {
   ExpenseRecord,
   CategoryName,
   ExpenseShare,
+  DashboardSummary,
 } from "@/types";
 
 /* ========== トークン管理 ========== */
@@ -189,6 +190,7 @@ export async function getGroup(groupId: string): Promise<Group> {
 export async function createGroup(input: {
   name: string;
   color?: string;
+  iconUrl?: string;
 }): Promise<Group> {
   return apiFetch<Group>("/api/groups", {
     method: "POST",
@@ -198,7 +200,7 @@ export async function createGroup(input: {
 
 export async function updateGroup(
   groupId: string,
-  input: { name?: string; color?: string }
+  input: { name?: string; color?: string; iconUrl?: string | null }
 ): Promise<Group> {
   return apiFetch<Group>(`/api/groups/${groupId}`, {
     method: "PUT",
@@ -238,6 +240,10 @@ export async function removeMember(
 
 export async function getExpenses(groupId: string): Promise<ExpenseRecord[]> {
   return apiFetch<ExpenseRecord[]>(`/api/groups/${groupId}/expenses`);
+}
+
+export async function getDashboardSummary(): Promise<DashboardSummary> {
+  return apiFetch<DashboardSummary>("/api/dashboard/summary");
 }
 
 export async function createExpense(

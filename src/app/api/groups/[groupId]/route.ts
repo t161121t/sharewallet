@@ -36,6 +36,7 @@ export async function GET(
       id: group.id,
       name: group.name,
       color: group.color,
+      iconUrl: group.iconUrl ?? undefined,
       members: group.members.map((m) => ({
         id: m.user.id,
         name: m.user.name,
@@ -81,12 +82,17 @@ export async function PUT(
         { status: 400 }
       );
     }
-    const data: { name?: string; color?: string } = {};
+    const data: { name?: string; color?: string; iconUrl?: string | null } = {};
     if (typeof body.name === "string" && body.name.trim().length > 0) {
       data.name = body.name.trim();
     }
     if (typeof body.color === "string" && /^#[0-9A-Fa-f]{6}$/.test(body.color)) {
       data.color = body.color;
+    }
+    if (body.iconUrl === null) {
+      data.iconUrl = null;
+    } else if (typeof body.iconUrl === "string") {
+      data.iconUrl = body.iconUrl;
     }
     const group = await prisma.group.update({
       where: { id: groupId },
@@ -104,6 +110,7 @@ export async function PUT(
       id: group.id,
       name: group.name,
       color: group.color,
+      iconUrl: group.iconUrl ?? undefined,
       members: group.members.map((m) => ({
         id: m.user.id,
         name: m.user.name,

@@ -1,5 +1,16 @@
 /** カテゴリ名 */
-export type CategoryName = "貯金" | "住居" | "交通" | "食費" | "娯楽" | "その他";
+export type CategoryName =
+  | "貯金"
+  | "住居"
+  | "交通"
+  | "食費"
+  | "娯楽"
+  | "医療"
+  | "日用品"
+  | "通信"
+  | "美容"
+  | "教育"
+  | "その他";
 export type GroupRole = "OWNER" | "ADMIN" | "MEMBER";
 
 /** グループメンバーの型 */
@@ -20,6 +31,8 @@ export type Group = {
   members: GroupMember[];
   /** グループのテーマカラー */
   color: string;
+  /** グループアイコン画像（Data URL） */
+  iconUrl?: string;
 };
 
 /** ユーザープロフィールの型 */
@@ -78,4 +91,29 @@ export type RegisterResponse = {
 /** API エラーレスポンス */
 export type ApiError = {
   error: string;
+};
+
+export type DashboardGroupSummary = {
+  groupId: string;
+  groupName: string;
+  groupColor: string;
+  groupIconUrl?: string;
+  amount: number;
+};
+
+export type DashboardCategorySummary = {
+  category: CategoryName;
+  amount: number;
+};
+
+export type DashboardSummary = {
+  totalPersonalAmount: number;
+  previousMonthTotalPersonalAmount: number;
+  byGroup: DashboardGroupSummary[];
+  byCategory: DashboardCategorySummary[];
+  period: {
+    from: string;
+    to: string;
+    label: string;
+  };
 };

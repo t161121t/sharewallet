@@ -11,10 +11,13 @@ import GroupBanner from "@/components/ui/GroupBanner";
 import ExpensePieChart, { type ExpenseCategory } from "@/components/ui/ExpensePieChart";
 import GenreSelect from "@/components/ui/GenreSelect";
 import PrimaryButton from "@/components/ui/PrimaryButton";
+import MemberAvatar from "@/components/ui/MemberAvatar";
 import type { Group, CategoryName, ExpenseRecord } from "@/types";
 import {
   isAuthenticated,
+  getGroups,
   getSelectedGroupId,
+  setSelectedGroupId,
   getGroup,
   getExpenses,
   createExpense,
@@ -22,27 +25,29 @@ import {
 } from "@/lib/apiClient";
 
 const CATEGORY_COLORS: Record<CategoryName, string> = {
-  貯金: "#34a853",
-  住居: "#e67e22",
-  交通: "#3498db",
-  食費: "#e74c3c",
-  娯楽: "#9b59b6",
+  貯金: "#22c55e",
+  住居: "#f97316",
+  交通: "#38bdf8",
+  食費: "#ef4444",
+  娯楽: "#8b5cf6",
+  医療: "#ec4899",
+  日用品: "#f59e0b",
+  通信: "#06b6d4",
+  美容: "#e879f9",
+  教育: "#6366f1",
   その他: "#94a3b8",
 };
 
 function normalizeCategory(category: string): CategoryName {
   if (category === "交通費") return "交通";
   if (category === "住居費") return "住居";
-  if (
-    category === "貯金" ||
-    category === "住居" ||
-    category === "交通" ||
-    category === "食費" ||
-    category === "娯楽" ||
-    category === "その他"
-  ) {
-    return category;
-  }
+  if (category === "通信費") return "通信";
+  if (category === "医療費") return "医療";
+  const valid: CategoryName[] = [
+    "貯金", "住居", "交通", "食費", "娯楽",
+    "医療", "日用品", "通信", "美容", "教育", "その他",
+  ];
+  if (valid.includes(category as CategoryName)) return category as CategoryName;
   return "その他";
 }
 
@@ -52,7 +57,9 @@ export default function ExpensePage() {
   const [amount, setAmount] = useState("");
   const [isReady, setIsReady] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [switchingGroup, setSwitchingGroup] = useState(false);
   const [group, setGroup] = useState<Group | null>(null);
+  const [myGroups, setMyGroups] = useState<Group[]>([]);
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const [shares, setShares] = useState<Record<string, string>>({});
 
@@ -63,6 +70,11 @@ export default function ExpensePage() {
       交通: 0,
       食費: 0,
       娯楽: 0,
+      医療: 0,
+      日用品: 0,
+      通信: 0,
+      美容: 0,
+      教育: 0,
       その他: 0,
     };
     for (const e of expenses) {
@@ -76,6 +88,19 @@ export default function ExpensePage() {
     }));
   }, [expenses]);
 
+  const loadGroupData = async (groupId: string, withSwitchLoading = false) => {
+    if (withSwitchLoading) setSwitchingGroup(true);
+    const [groupData, expensesData] = await Promise.all([getGroup(groupId), getExpenses(groupId)]);
+    setGroup(groupData);
+    setExpenses(expensesData);
+    const initial = Object.fromEntries(
+      groupData.members.map((m) => [m.id, (100 / groupData.members.length).toFixed(2)])
+    );
+    setShares(initial);
+    setSelectedGroupId(groupData.id);
+    if (withSwitchLoading) setSwitchingGroup(false);
+  };
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!isAuthenticated()) {
@@ -83,27 +108,33 @@ export default function ExpensePage() {
       return;
     }
 
-    const groupId = getSelectedGroupId();
-    if (!groupId) {
-      router.replace("/dashboard");
-      return;
-    }
-
-    // API からグループ情報を取得
-    Promise.all([getGroup(groupId), getExpenses(groupId)])
-      .then(([groupData, expensesData]) => {
-        setGroup(groupData);
-        setExpenses(expensesData);
-        const initial = Object.fromEntries(
-          groupData.members.map((m) => [m.id, (100 / groupData.members.length).toFixed(2)])
-        );
-        setShares(initial);
+    getGroups()
+      .then(async (groupList) => {
+        setMyGroups(groupList);
+        if (groupList.length === 0) {
+          setIsReady(true);
+          return;
+        }
+        const savedId = getSelectedGroupId();
+        const resolvedId =
+          savedId && groupList.some((g) => g.id === savedId) ? savedId : groupList[0].id;
+        await loadGroupData(resolvedId);
         setIsReady(true);
       })
       .catch(() => {
         router.replace("/dashboard");
       });
   }, [router]);
+
+  const handleGroupChange = async (nextGroupId: string) => {
+    if (!nextGroupId || nextGroupId === group?.id) return;
+    try {
+      await loadGroupData(nextGroupId, true);
+    } catch {
+      toast.error("グループ切替に失敗しました");
+      setSwitchingGroup(false);
+    }
+  };
 
   const handleRegister = async () => {
     if (!genre || !amount) {
@@ -144,8 +175,25 @@ export default function ExpensePage() {
     }
   };
 
-  if (!isReady || !group) {
+  if (!isReady) {
     return <RouteLoading text="支出入力画面を準備中..." withBottomNav />;
+  }
+  if (!group) {
+    return (
+      <ScreenContainer>
+        <PageTransition className="flex flex-col items-center w-full flex-1 pb-20">
+          <p className="text-4xl text-[#2d2a26] dark:text-[#eae7e1] pb-3" style={{ fontFamily: "var(--font-dancing-script), cursive" }}>
+            Share Wallet
+          </p>
+          <div className="w-full rounded-2xl border border-dashed border-[#ddd6c8] dark:border-[#3c3a36] px-5 py-10 text-center">
+            <p className="text-4xl mb-3">👥</p>
+            <p className="text-sm font-medium text-[#8c867d] dark:text-[#8f8a84]">まだグループがありません</p>
+            <p className="text-xs text-[#b5b0a8] dark:text-[#5c5955] mt-1">先にグループを作成してください</p>
+          </div>
+        </PageTransition>
+        <BottomNav />
+      </ScreenContainer>
+    );
   }
 
   return (
@@ -163,6 +211,31 @@ export default function ExpensePage() {
         <div className="w-full">
           <GroupBanner group={group} />
         </div>
+
+        <label className="w-full mt-4">
+          <div className="text-sm font-semibold text-[#4a4540] dark:text-[#c5c0b8] mb-2">
+            入力対象グループ
+          </div>
+          <select
+            value={group.id}
+            onChange={(e) => handleGroupChange(e.target.value)}
+            className={[
+              "w-full h-11 rounded-xl px-3 outline-none appearance-none cursor-pointer text-sm",
+              "bg-white dark:bg-[#1c1b19] border border-[#e5e0d8] dark:border-[#333230]",
+              "text-[#2d2a26] dark:text-[#eae7e1]",
+              "focus:ring-2 focus:ring-[#c9a227] focus:border-[#c9a227]",
+            ].join(" ")}
+          >
+            {myGroups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+          {switchingGroup && (
+            <p className="text-xs text-[#9e9a93] dark:text-[#77736d] mt-1">グループを切り替え中...</p>
+          )}
+        </label>
 
         {/* ページタイトル */}
         <h1 className="text-xl font-bold text-[#2d2a26] dark:text-[#eae7e1] w-full text-center mt-5">
@@ -216,9 +289,17 @@ export default function ExpensePage() {
             <div className="flex flex-col gap-2">
               {group.members.map((m) => (
                 <label key={m.id} className="flex items-center justify-between gap-2">
-                  <span className="text-sm text-[#4a4540] dark:text-[#c5c0b8]">
-                    {m.name}
-                  </span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <MemberAvatar
+                      name={m.name}
+                      color={m.color}
+                      avatarUrl={m.avatarUrl}
+                      size={28}
+                    />
+                    <span className="text-sm text-[#4a4540] dark:text-[#c5c0b8] truncate">
+                      {m.name}
+                    </span>
+                  </div>
                   <input
                     type="number"
                     min={0}

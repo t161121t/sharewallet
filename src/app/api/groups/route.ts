@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
       id: g.id,
       name: g.name,
       color: g.color,
+      iconUrl: g.iconUrl ?? undefined,
       members: g.members.map((m) => ({
         id: m.user.id,
         name: m.user.name,
@@ -63,11 +64,13 @@ export async function POST(req: NextRequest) {
       typeof body.color === "string" && /^#[0-9A-Fa-f]{6}$/.test(body.color)
         ? body.color
         : "#c9a227";
+    const iconUrl = typeof body.iconUrl === "string" ? body.iconUrl : null;
 
     const created = await prisma.group.create({
       data: {
         name: body.name.trim(),
         color,
+        iconUrl,
         members: {
           create: [{ userId, role: GroupRole.OWNER }],
         },
@@ -85,6 +88,7 @@ export async function POST(req: NextRequest) {
       id: created.id,
       name: created.name,
       color: created.color,
+      iconUrl: created.iconUrl ?? undefined,
       members: created.members.map((m) => ({
         id: m.user.id,
         name: m.user.name,

@@ -9,6 +9,7 @@ import PageTransition from "@/components/layout/PageTransition";
 import BottomNav from "@/components/layout/BottomNav";
 import RouteLoading from "@/components/layout/RouteLoading";
 import CategoryIcon from "@/components/icons/CategoryIcon";
+import GroupAvatar from "@/components/ui/GroupAvatar";
 import type { Group, ExpenseRecord, CategoryName } from "@/types";
 import {
   isAuthenticated,
@@ -28,6 +29,11 @@ const CATEGORY_COLORS: Record<CategoryName, string> = {
   交通: "#38bdf8",
   食費: "#ef4444",
   娯楽: "#8b5cf6",
+  医療: "#ec4899",
+  日用品: "#f59e0b",
+  通信: "#06b6d4",
+  美容: "#e879f9",
+  教育: "#6366f1",
   その他: "#94a3b8",
 };
 
@@ -293,11 +299,7 @@ export default function HistoryPage() {
         </p>
 
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 rounded-full bg-[#c9a227] flex items-center justify-center shrink-0">
-            <svg viewBox="0 0 24 24" fill="white" width={16} height={16}>
-              <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
-            </svg>
-          </div>
+          <GroupAvatar name={group.name} color={group.color} iconUrl={group.iconUrl} size={32} className="rounded-full" />
           <span className="text-lg font-bold text-[#2d2a26] dark:text-[#eae7e1]">
             {group.name}
           </span>

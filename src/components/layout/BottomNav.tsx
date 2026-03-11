@@ -2,8 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import MemberAvatar from "@/components/ui/MemberAvatar";
+import { getCachedUser } from "@/lib/apiClient";
 
-const NAV_ITEMS = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+};
+
+const STATIC_ITEMS: NavItem[] = [
   {
     href: "/dashboard",
     label: "ホーム",
@@ -31,24 +40,56 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
-  {
-    href: "/profile",
-    label: "マイページ",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="currentColor" width={24} height={24}>
-        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-      </svg>
-    ),
-  },
 ];
+
+const PROFILE_FALLBACK_ICON = (
+  <svg viewBox="0 0 24 24" fill="currentColor" width={24} height={24}>
+    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+  </svg>
+);
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const [user, setUser] = useState<{ name: string; color: string; avatarUrl?: string } | null>(null);
+
+  useEffect(() => {
+    const cached = getCachedUser();
+    if (cached) setUser(cached);
+
+    const onStorage = () => {
+      const updated = getCachedUser();
+      if (updated) setUser(updated);
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  useEffect(() => {
+    const cached = getCachedUser();
+    if (cached) setUser(cached);
+  }, [pathname]);
+
+  const profileIcon = user ? (
+    <MemberAvatar
+      name={user.name}
+      color={user.color}
+      avatarUrl={user.avatarUrl}
+      size={24}
+      className="ring-1 ring-white/30 dark:ring-black/30"
+    />
+  ) : (
+    PROFILE_FALLBACK_ICON
+  );
+
+  const allItems: NavItem[] = [
+    ...STATIC_ITEMS,
+    { href: "/profile", label: "マイページ", icon: profileIcon },
+  ];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#1c1b19]/95 backdrop-blur-md border-t border-[#e5e0d8] dark:border-[#333230] z-50">
       <div className="max-w-lg mx-auto flex">
-        {NAV_ITEMS.map((item) => {
+        {allItems.map((item) => {
           const isActive = pathname === item.href;
           return (
             <Link
