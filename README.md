@@ -1,7 +1,7 @@
 # ShareWallet Frontend
 
-ShareWallet のフロントエンド（Next.js + Prisma + SQLite）です。  
-他の人にコードを渡してもそのまま動かせるよう、セットアップ手順をまとめています。
+ShareWallet のフロントエンド（Next.js + Prisma + Supabase PostgreSQL）です。  
+ローカル開発とVercel本番デプロイまでの手順をまとめています。
 
 ## 前提環境
 
@@ -17,21 +17,34 @@ cd sharewallet_frontend
 npm install
 ```
 
-### 環境変数
+## Supabase 準備
 
-`.env` を作成してください（既にある場合はそのままでOK）。
+1. Supabaseで新規プロジェクトを作成（Free plan）。
+2. `Project Settings > Database` から接続URLを取得。
+3. `Transaction pooler` の接続文字列を `DATABASE_URL` に設定。
 
-```env
-DATABASE_URL="file:./dev.db"
-JWT_SECRET="dev-secret-change-in-production"
-```
+## 環境変数
 
-## DB 準備
-
-このプロジェクトは Prisma + SQLite を使います。初回は以下を実行してください。
+`.env.example` をコピーして `.env` を作成します。
 
 ```bash
-npx prisma db push
+cp .env.example .env
+```
+
+`.env` の値を埋めてください。
+
+```env
+DATABASE_URL="postgresql://postgres.<project-ref>:<password>@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
+DIRECT_URL="postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres"
+JWT_SECRET="your-long-random-secret"
+```
+
+## DB 準備（Prisma）
+
+初回は以下を実行してください。
+
+```bash
+npx prisma migrate dev --name init_postgres
 npx prisma generate
 ```
 
@@ -53,6 +66,16 @@ npm run dev
 
 - http://localhost:3000
 
+## Vercel デプロイ
+
+1. GitHubリポジトリをVercelにImport
+2. Environment Variablesに以下を設定
+   - `DATABASE_URL`（Supabase pooler URL）
+   - `DIRECT_URL`（Supabase direct URL）
+   - `JWT_SECRET`
+3. `main` ブランチをデプロイ
+4. デプロイ後、ログイン・グループ取得・支出登録を確認
+
 ## よく使うコマンド
 
 ```bash
@@ -63,36 +86,25 @@ npm run build    # 本番ビルド
 
 ## トラブルシュート
 
-### 1) `better-sqlite3` の Node バージョン不一致エラー
+### 1) Prisma の接続エラー（P1001 / P1002）
 
-`NODE_MODULE_VERSION` 系エラーが出た場合:
+- `DATABASE_URL` の project-ref / password が正しいか確認
+- Supabase DB が停止していないか確認
+- pooler URL を使っている場合は `?pgbouncer=true&connection_limit=1` を付与
 
-```bash
-npm rebuild better-sqlite3
-npx prisma generate
-```
+### 2) Migration が失敗する
 
-直らない場合:
+- `DIRECT_URL` を設定して再実行
+- `npx prisma migrate reset`（開発環境のみ）でやり直し
 
-```bash
-rm -rf node_modules package-lock.json
-npm install
-npx prisma generate
-```
-
-### 2) `Next.js inferred your workspace root` 警告
+### 3) `Next.js inferred your workspace root` 警告
 
 複数 lockfile がある環境で出る警告です。  
 基本的に開発動作には影響しません。
 
-### 3) 画面反映が古い
-
-- ブラウザでハードリロード（Mac: `Cmd + Shift + R`）
-- それでも反映しない場合は `npm run dev` を再起動
-
 ## 引き継ぎメモ
 
-- DB はローカル SQLite（`dev.db`）です
+- DB は Supabase PostgreSQL です
 - API は `src/app/api` 配下の Route Handler です
 - 主要型は `src/types/index.ts`
 - API クライアントは `src/lib/apiClient.ts`

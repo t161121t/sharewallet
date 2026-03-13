@@ -43,7 +43,6 @@ export default function ColorPalette({ value, onChange }: ColorPaletteProps) {
               ].join(" ")}
               style={{
                 backgroundColor: p.color,
-                ringColor: isActive ? p.color : undefined,
               }}
             >
               {isActive && (
