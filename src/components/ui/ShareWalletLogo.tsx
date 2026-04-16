@@ -10,8 +10,7 @@ type ShareWalletLogoProps = SVGProps<SVGSVGElement> & {
 /**
  * ハート型財布ロゴ（SVG）
  *
- * 2つの財布がハートの形に合体したデザイン。
- * sharewallet-logo.png を参考に SVG で再現。
+ * 丸みが強くかわいいハート型。ほっぺのブラッシュとスパークル装飾付き。
  */
 export default function ShareWalletLogo({
   size = 120,
@@ -25,134 +24,169 @@ export default function ShareWalletLogo({
     <svg
       width={size}
       height={totalHeight}
-      viewBox={`0 0 120 ${showText ? 156 : 120}`}
+      viewBox={`0 0 120 ${showText ? 158 : 120}`}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-label="ShareWallet ロゴ"
       {...rest}
     >
       <defs>
-        {/* メインのゴールドグラデーション */}
-        <linearGradient id="sw-gold" x1="20" y1="10" x2="100" y2="110" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#F7DC6F" />
-          <stop offset="0.35" stopColor="#D4AF37" />
-          <stop offset="0.7" stopColor="#C9A227" />
-          <stop offset="1" stopColor="#B8860B" />
+        {/* メインゴールド — 暖かみのあるアンバー系 */}
+        <linearGradient id="sw-gold" x1="18" y1="8" x2="102" y2="112" gradientUnits="userSpaceOnUse">
+          <stop offset="0"    stopColor="#FFE87A" />
+          <stop offset="0.3"  stopColor="#F5C538" />
+          <stop offset="0.65" stopColor="#D49018" />
+          <stop offset="1"    stopColor="#B86A08" />
         </linearGradient>
-        {/* ハイライト用 */}
-        <linearGradient id="sw-highlight" x1="30" y1="15" x2="60" y2="60" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#FBE88A" stopOpacity="0.6" />
-          <stop offset="1" stopColor="#D4AF37" stopOpacity="0" />
+
+        {/* トップハイライト */}
+        <linearGradient id="sw-highlight" x1="22" y1="8" x2="62" y2="58" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#FFFCE0" stopOpacity="0.75" />
+          <stop offset="1" stopColor="#F5C538" stopOpacity="0" />
         </linearGradient>
+
+        {/* エッジシャドウ */}
+        <radialGradient id="sw-edge" cx="50%" cy="45%" r="58%" gradientUnits="objectBoundingBox">
+          <stop offset="0.45" stopColor="transparent" />
+          <stop offset="1"    stopColor="#7A4400" stopOpacity="0.22" />
+        </radialGradient>
+
+        {/* コイングラデーション */}
+        <radialGradient id="sw-coin" cx="38%" cy="32%" r="62%" gradientUnits="objectBoundingBox">
+          <stop offset="0"   stopColor="#FFF0A0" />
+          <stop offset="0.5" stopColor="#EAA818" />
+          <stop offset="1"   stopColor="#B86808" />
+        </radialGradient>
       </defs>
 
-      {/* === ハート型の外形 === */}
+      {/* ===== 丸みUP！かわいいハート外形 ===== */}
       <path
         d="
-          M60 108
-          L16 62
-          C4 48 4 28 18 16
-          C28 8 42 8 52 18
-          L60 28
-          L68 18
-          C78 8 92 8 102 16
-          C116 28 116 48 104 62
+          M60 107
+          C51 97, 14 79, 9 55
+          C4 33, 19 11, 41 11
+          C52 11, 58 20, 60 30
+          C62 20, 68 11, 79 11
+          C101 11, 116 33, 111 55
+          C106 79, 69 97, 60 107
           Z
         "
         fill="url(#sw-gold)"
-        stroke="#A07D1C"
-        strokeWidth="1.5"
+        stroke="#C07200"
+        strokeWidth="1.2"
       />
-
-      {/* ハイライト */}
+      {/* トップハイライトレイヤー */}
       <path
         d="
-          M60 108
-          L16 62
-          C4 48 4 28 18 16
-          C28 8 42 8 52 18
-          L60 28
-          L68 18
-          C78 8 92 8 102 16
-          C116 28 116 48 104 62
+          M60 107
+          C51 97, 14 79, 9 55
+          C4 33, 19 11, 41 11
+          C52 11, 58 20, 60 30
+          C62 20, 68 11, 79 11
+          C101 11, 116 33, 111 55
+          C106 79, 69 97, 60 107
           Z
         "
         fill="url(#sw-highlight)"
       />
-
-      {/* === 左の財布フタ（フラップ） === */}
+      {/* エッジシャドウレイヤー */}
       <path
-        d="M22 36 L56 36 L56 30 C56 26 50 22 44 22 L34 22 C28 22 22 26 22 30 Z"
-        fill="#C9A227"
-        stroke="#A07D1C"
+        d="
+          M60 107
+          C51 97, 14 79, 9 55
+          C4 33, 19 11, 41 11
+          C52 11, 58 20, 60 30
+          C62 20, 68 11, 79 11
+          C101 11, 116 33, 111 55
+          C106 79, 69 97, 60 107
+          Z
+        "
+        fill="url(#sw-edge)"
+      />
+
+      {/* ===== 左の財布フタ（丸くかわいく） ===== */}
+      <path
+        d="M19 38 C19 28, 27 21, 40 21 L52 21 C59 21, 59 29, 59 36 L19 36 Z"
+        fill="#D49018"
+        stroke="#B87000"
         strokeWidth="0.8"
       />
-      {/* 左フラップのライン */}
-      <line x1="26" y1="32" x2="52" y2="32" stroke="white" strokeWidth="1.2" strokeOpacity="0.5" />
+      <line x1="24" y1="30" x2="54" y2="30" stroke="white" strokeWidth="1.1" strokeOpacity="0.4" />
+      {/* 左フタの丸みライン */}
+      <path d="M22 24 C28 19, 36 18, 44 19" stroke="white" strokeWidth="0.8" strokeOpacity="0.3" fill="none" strokeLinecap="round" />
 
-      {/* === 右の財布フタ（フラップ） === */}
+      {/* ===== 右の財布フタ ===== */}
       <path
-        d="M64 36 L98 36 L98 30 C98 26 92 22 86 22 L76 22 C70 22 64 26 64 30 Z"
-        fill="#C9A227"
-        stroke="#A07D1C"
+        d="M61 36 C61 29, 61 21, 68 21 L80 21 C93 21, 101 28, 101 38 L61 36 Z"
+        fill="#D49018"
+        stroke="#B87000"
         strokeWidth="0.8"
       />
-      {/* 右フラップのライン */}
-      <line x1="68" y1="32" x2="94" y2="32" stroke="white" strokeWidth="1.2" strokeOpacity="0.5" />
+      <line x1="66" y1="30" x2="96" y2="30" stroke="white" strokeWidth="1.1" strokeOpacity="0.4" />
+      <path d="M98 24 C92 19, 84 18, 76 19" stroke="white" strokeWidth="0.8" strokeOpacity="0.3" fill="none" strokeLinecap="round" />
 
-      {/* === 財布の本体部分のライン === */}
-      {/* 中央の分割線 */}
-      <line x1="60" y1="28" x2="60" y2="90" stroke="white" strokeWidth="1.5" strokeOpacity="0.4" />
+      {/* 中央の仕切りライン */}
+      <line x1="60" y1="28" x2="60" y2="88" stroke="white" strokeWidth="1.3" strokeOpacity="0.3" />
 
-      {/* 左の財布ポケット */}
-      <path
-        d="M24 42 L54 42 L54 60 L24 60 Z"
-        fill="none"
-        stroke="white"
-        strokeWidth="1"
-        strokeOpacity="0.35"
-        rx="2"
-      />
+      {/* ===== ほっぺのブラッシュ（キュートポイント！）===== */}
+      <ellipse cx="21" cy="60" rx="9"  ry="6"  fill="#FF9060" opacity="0.28" />
+      <ellipse cx="99" cy="60" rx="9"  ry="6"  fill="#FF9060" opacity="0.28" />
 
-      {/* 右の財布ポケット */}
-      <path
-        d="M66 42 L96 42 L96 60 L66 60 Z"
-        fill="none"
-        stroke="white"
-        strokeWidth="1"
-        strokeOpacity="0.35"
-        rx="2"
-      />
-
-      {/* === 留め具（左） === */}
-      <circle cx="24" cy="52" r="4" fill="#B8860B" stroke="#A07D1C" strokeWidth="0.6" />
-      <circle cx="24" cy="52" r="2" fill="#D4AF37" />
-
-      {/* === 留め具（右） === */}
-      <circle cx="96" cy="52" r="4" fill="#B8860B" stroke="#A07D1C" strokeWidth="0.6" />
-      <circle cx="96" cy="52" r="2" fill="#D4AF37" />
-
-      {/* === 中央のコイン === */}
-      <circle cx="60" cy="78" r="10" fill="#B8860B" stroke="#8B6914" strokeWidth="1" />
-      <circle cx="60" cy="78" r="7" fill="#D4AF37" />
-      <circle cx="60" cy="78" r="4" fill="#E8C547" opacity="0.8" />
-      {/* コインの ¥ マーク */}
+      {/* ===== 中央コイン（大きめ・キラキラ）===== */}
+      <circle cx="60" cy="72" r="14" fill="#B86808" stroke="#8A4E00" strokeWidth="1.2" />
+      <circle cx="60" cy="72" r="11" fill="url(#sw-coin)" />
+      <circle cx="60" cy="72" r="7"  fill="#F5C538" opacity="0.9" />
+      {/* ¥ マーク */}
       <text
         x="60"
-        y="78"
+        y="72"
         textAnchor="middle"
         dominantBaseline="central"
-        fill="#8B6914"
-        style={{ fontSize: 8, fontWeight: 700 }}
+        fill="#7A4400"
+        style={{ fontSize: 9, fontWeight: 800 }}
       >
         ¥
       </text>
+      {/* コインのキラリ */}
+      <circle cx="55" cy="67" r="2.2" fill="white" opacity="0.4" />
+      <circle cx="57" cy="66" r="0.9" fill="white" opacity="0.6" />
 
-      {/* === "ShareWallet" テキスト === */}
+      {/* ===== スパークル装飾 ===== */}
+      {/* 左上 大 */}
+      <path
+        d="M17 19 L18.8 14 L20.6 19 L25.6 20.8 L20.6 22.6 L18.8 27.6 L17 22.6 L12 20.8 Z"
+        fill="#FFE87A"
+        opacity="0.95"
+      />
+      {/* 右上 大 */}
+      <path
+        d="M99.4 19 L101.2 14 L103 19 L108 20.8 L103 22.6 L101.2 27.6 L99.4 22.6 L94.4 20.8 Z"
+        fill="#FFE87A"
+        opacity="0.95"
+      />
+      {/* 右中 小 */}
+      <path
+        d="M97 72 L98 69.5 L99 72 L101.5 73 L99 74 L98 76.5 L97 74 L94.5 73 Z"
+        fill="#FFE87A"
+        opacity="0.75"
+      />
+      {/* 左中 小 */}
+      <path
+        d="M23 72 L24 69.5 L25 72 L27.5 73 L25 74 L24 76.5 L23 74 L20.5 73 Z"
+        fill="#FFE87A"
+        opacity="0.75"
+      />
+      {/* ランダムドット */}
+      <circle cx="32" cy="90" r="1.5" fill="#FFE87A" opacity="0.5" />
+      <circle cx="88" cy="90" r="1.5" fill="#FFE87A" opacity="0.5" />
+      <circle cx="14" cy="42" r="1.2" fill="#FFE87A" opacity="0.45" />
+      <circle cx="106" cy="42" r="1.2" fill="#FFE87A" opacity="0.45" />
+
+      {/* ===== テキスト ===== */}
       {showText && (
         <text
           x="60"
-          y="142"
+          y="144"
           textAnchor="middle"
           dominantBaseline="central"
           fill="#3D3D3D"
