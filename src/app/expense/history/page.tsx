@@ -307,6 +307,14 @@ export default function HistoryPage() {
 
         <SummaryCard expenses={expenses} group={group} />
 
+        <button
+          type="button"
+          onClick={() => router.push(`/groups/${groupId}/settlement`)}
+          className="w-full mt-3 h-11 rounded-xl border border-[#c9a227] text-[#c9a227] font-semibold text-sm"
+        >
+          精算を確認 →
+        </button>
+
         <h2 className="text-lg font-bold text-[#2d2a26] dark:text-[#eae7e1] mt-6 mb-2">
           支出履歴
         </h2>

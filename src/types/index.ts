@@ -106,6 +106,34 @@ export type DashboardCategorySummary = {
   amount: number;
 };
 
+export type MemberBalance = {
+  userId: string;
+  userName: string;
+  userColor: string;
+  userAvatarUrl?: string;
+  /** 正: 受け取るべき金額、負: 支払うべき金額 */
+  balance: number;
+};
+
+export type SettlementTransaction = {
+  fromUserId: string;
+  fromUserName: string;
+  fromUserColor: string;
+  fromUserAvatarUrl?: string;
+  toUserId: string;
+  toUserName: string;
+  toUserColor: string;
+  toUserAvatarUrl?: string;
+  amount: number;
+};
+
+export type SettlementResult = {
+  transactions: SettlementTransaction[];
+  memberBalances: MemberBalance[];
+  totalExpenseAmount: number;
+  expenseCount: number;
+};
+
 export type DashboardSummary = {
   totalPersonalAmount: number;
   previousMonthTotalPersonalAmount: number;
