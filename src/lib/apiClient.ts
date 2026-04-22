@@ -14,6 +14,7 @@ import type {
   CategoryName,
   ExpenseShare,
   DashboardSummary,
+  SettlementResult,
 } from "@/types";
 
 /* ========== トークン管理 ========== */
@@ -287,6 +288,10 @@ export async function deleteExpense(
   return apiFetch<{ ok: boolean }>(`/api/groups/${groupId}/expenses/${expenseId}`, {
     method: "DELETE",
   });
+}
+
+export async function getSettlement(groupId: string): Promise<SettlementResult> {
+  return apiFetch<SettlementResult>(`/api/groups/${groupId}/settlement`);
 }
 
 export { ApiClientError };
