@@ -94,7 +94,7 @@ export async function POST(
         { status: 400 }
       );
     }
-    if (incomingShares.some((s) => !memberIds.has(s.userId) || s.percent <= 0)) {
+    if (incomingShares.some((s) => !memberIds.has(s.userId) || s.percent < 0)) {
       return NextResponse.json<ApiError>(
         { error: "配分比率に不正なメンバーまたは値が含まれています" },
         { status: 400 }

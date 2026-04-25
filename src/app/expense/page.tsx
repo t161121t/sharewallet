@@ -93,8 +93,11 @@ export default function ExpensePage() {
     const [groupData, expensesData] = await Promise.all([getGroup(groupId), getExpenses(groupId)]);
     setGroup(groupData);
     setExpenses(expensesData);
+    const n = groupData.members.length;
+    const base = Math.floor(100 / n / 10) * 10;
+    const extra = (100 - base * n) / 10;
     const initial = Object.fromEntries(
-      groupData.members.map((m) => [m.id, (100 / groupData.members.length).toFixed(2)])
+      groupData.members.map((m, i) => [m.id, String(base + (i < extra ? 10 : 0))])
     );
     setShares(initial);
     setSelectedGroupId(groupData.id);
@@ -282,39 +285,69 @@ export default function ExpensePage() {
             </PrimaryButton>
           </div>
 
-          <div className="rounded-xl p-4 border border-[#e5e0d8] dark:border-[#333230]">
-            <p className="text-sm font-semibold text-[#2d2a26] dark:text-[#eae7e1] mb-3">
-              負担比率（%）
-            </p>
-            <div className="flex flex-col gap-2">
-              {group.members.map((m) => (
-                <label key={m.id} className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <MemberAvatar
-                      name={m.name}
-                      color={m.color}
-                      avatarUrl={m.avatarUrl}
-                      size={28}
-                    />
-                    <span className="text-sm text-[#4a4540] dark:text-[#c5c0b8] truncate">
-                      {m.name}
-                    </span>
-                  </div>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={0.01}
-                    value={shares[m.id] ?? ""}
-                    onChange={(e) =>
-                      setShares((prev) => ({ ...prev, [m.id]: e.target.value }))
-                    }
-                    className="w-28 h-10 rounded-lg px-3 border border-[#e5e0d8] dark:border-[#333230] bg-white dark:bg-[#1c1b19]"
-                  />
-                </label>
-              ))}
-            </div>
-          </div>
+          {(() => {
+            const total = group.members.reduce(
+              (sum, m) => sum + Number(shares[m.id] || 0),
+              0
+            );
+            const isValid = total === 100;
+            return (
+              <div className="rounded-xl p-4 border border-[#e5e0d8] dark:border-[#333230]">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-[#2d2a26] dark:text-[#eae7e1]">
+                    負担比率（10%単位）
+                  </p>
+                  <span
+                    className={[
+                      "text-xs font-bold px-2 py-0.5 rounded-full",
+                      isValid
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                        : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-300",
+                    ].join(" ")}
+                  >
+                    合計 {total}%
+                  </span>
+                </div>
+                <div className="flex flex-col gap-3">
+                  {group.members.map((m) => {
+                    const val = Number(shares[m.id] || 0);
+                    return (
+                      <div key={m.id} className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <MemberAvatar
+                              name={m.name}
+                              color={m.color}
+                              avatarUrl={m.avatarUrl}
+                              size={24}
+                            />
+                            <span className="text-sm text-[#4a4540] dark:text-[#c5c0b8] truncate">
+                              {m.name}
+                            </span>
+                          </div>
+                          <span className="text-sm font-bold tabular-nums text-[#2d2a26] dark:text-[#eae7e1] w-12 text-right">
+                            {val}%
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          step={10}
+                          value={val}
+                          onChange={(e) =>
+                            setShares((prev) => ({ ...prev, [m.id]: e.target.value }))
+                          }
+                          style={{ accentColor: m.color }}
+                          className="w-full h-2 rounded-full cursor-pointer"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </PageTransition>
 
