@@ -16,6 +16,11 @@ enum GroupRole {
   MEMBER
 }
 
+enum InvitationStatus {
+  ACTIVE
+  REVOKED
+}
+
 model User {
   id           String   @id @default(cuid())
   name         String
@@ -26,9 +31,10 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  groups   GroupMember[]
-  expenses Expense[]
-  shares   ExpenseShare[]
+  groups             GroupMember[]
+  expenses           Expense[]
+  shares             ExpenseShare[]
+  createdInvitations GroupInvitation[]
 
   @@map("users")
 }
@@ -41,8 +47,9 @@ model Group {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  members  GroupMember[]
-  expenses Expense[]
+  members     GroupMember[]
+  expenses    Expense[]
+  invitations GroupInvitation[]
 
   @@map("groups")
 }
@@ -90,4 +97,19 @@ model ExpenseShare {
 
   @@unique([expenseId, userId])
   @@map("expense_shares")
+}
+
+model GroupInvitation {
+  id          String           @id @default(cuid())
+  token       String           @unique
+  groupId     String           @map("group_id")
+  createdById String           @map("created_by_id")
+  expiresAt   DateTime?        @map("expires_at")
+  status      InvitationStatus @default(ACTIVE)
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  group     Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy User  @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@map("group_invitations")
 }

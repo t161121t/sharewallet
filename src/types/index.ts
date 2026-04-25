@@ -134,6 +134,25 @@ export type SettlementResult = {
   expenseCount: number;
 };
 
+export type GroupInvitation = {
+  id: string;
+  token: string;
+  url: string;
+  expiresAt: string | null;
+  createdAt: string;
+  status: "ACTIVE" | "REVOKED";
+};
+
+export type InvitationInfo = {
+  groupId: string;
+  groupName: string;
+  groupColor: string;
+  groupIconUrl?: string;
+  memberCount: number;
+  createdByName: string;
+  expiresAt: string | null;
+};
+
 export type DashboardSummary = {
   totalPersonalAmount: number;
   previousMonthTotalPersonalAmount: number;
