@@ -10,6 +10,8 @@ import type {
   RegisterResponse,
   UserProfile,
   Group,
+  GroupInvitation,
+  InvitationInfo,
   ExpenseRecord,
   CategoryName,
   ExpenseShare,
@@ -292,6 +294,45 @@ export async function deleteExpense(
 
 export async function getSettlement(groupId: string): Promise<SettlementResult> {
   return apiFetch<SettlementResult>(`/api/groups/${groupId}/settlement`);
+}
+
+/* ========== 招待リンク API ========== */
+
+export async function createInvitation(
+  groupId: string,
+  expiresInDays = 7
+): Promise<GroupInvitation> {
+  return apiFetch<GroupInvitation>(`/api/groups/${groupId}/invitations`, {
+    method: "POST",
+    body: JSON.stringify({ expiresInDays }),
+  });
+}
+
+export async function getInvitations(groupId: string): Promise<GroupInvitation[]> {
+  return apiFetch<GroupInvitation[]>(`/api/groups/${groupId}/invitations`);
+}
+
+export async function revokeInvitation(
+  groupId: string,
+  invitationId: string
+): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>(
+    `/api/groups/${groupId}/invitations/${invitationId}`,
+    { method: "DELETE" }
+  );
+}
+
+export async function getInvitationInfo(token: string): Promise<InvitationInfo> {
+  return apiFetch<InvitationInfo>(`/api/invite/${token}`);
+}
+
+export async function acceptInvitation(
+  token: string
+): Promise<{ groupId: string; groupName: string }> {
+  return apiFetch<{ groupId: string; groupName: string }>(
+    `/api/invite/${token}/accept`,
+    { method: "POST" }
+  );
 }
 
 export { ApiClientError };

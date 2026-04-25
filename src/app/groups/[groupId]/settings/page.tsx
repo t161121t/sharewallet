@@ -11,13 +11,16 @@ import TextInput from "@/components/ui/TextInput";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import ColorPalette from "@/components/ui/ColorPalette";
 import GroupAvatar from "@/components/ui/GroupAvatar";
-import type { Group } from "@/types";
+import type { Group, GroupInvitation } from "@/types";
 import {
   ApiClientError,
   addMember,
+  createInvitation,
   deleteGroup,
   getGroup,
+  getInvitations,
   removeMember,
+  revokeInvitation,
   updateGroup,
 } from "@/lib/apiClient";
 
@@ -33,14 +36,17 @@ export default function GroupSettingsPage() {
   const [iconUrl, setIconUrl] = useState<string | undefined>(undefined);
   const [inviteEmail, setInviteEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  const [invitations, setInvitations] = useState<GroupInvitation[]>([]);
+  const [newInviteUrl, setNewInviteUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    getGroup(groupId)
-      .then((g) => {
+    Promise.all([getGroup(groupId), getInvitations(groupId)])
+      .then(([g, invs]) => {
         setGroup(g);
         setName(g.name);
         setColor(g.color);
         setIconUrl(g.iconUrl);
+        setInvitations(invs);
       })
       .catch(() => {
         router.replace("/dashboard");
@@ -48,11 +54,41 @@ export default function GroupSettingsPage() {
   }, [groupId, router]);
 
   const refresh = async () => {
-    const g = await getGroup(groupId);
+    const [g, invs] = await Promise.all([getGroup(groupId), getInvitations(groupId)]);
     setGroup(g);
     setName(g.name);
     setColor(g.color);
     setIconUrl(g.iconUrl);
+    setInvitations(invs);
+  };
+
+  const handleCreateInvite = async () => {
+    try {
+      const inv = await createInvitation(groupId);
+      setNewInviteUrl(inv.url);
+      setInvitations((prev) => [inv, ...prev]);
+    } catch (e) {
+      toast.error(e instanceof ApiClientError ? e.message : "招待リンクの作成に失敗しました");
+    }
+  };
+
+  const handleCopyInvite = (url: string) => {
+    navigator.clipboard.writeText(url).then(() => toast.success("コピーしました"));
+  };
+
+  const handleRevoke = async (invitationId: string) => {
+    if (!confirm("この招待リンクを無効化しますか？")) return;
+    try {
+      await revokeInvitation(groupId, invitationId);
+      toast.success("招待リンクを無効化しました");
+      setInvitations((prev) => prev.filter((inv) => inv.id !== invitationId));
+      if (newInviteUrl) {
+        const revoked = invitations.find((inv) => inv.id === invitationId);
+        if (revoked && newInviteUrl === revoked.url) setNewInviteUrl(null);
+      }
+    } catch (e) {
+      toast.error(e instanceof ApiClientError ? e.message : "招待リンクの無効化に失敗しました");
+    }
   };
 
   const handleIconChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -185,18 +221,87 @@ export default function GroupSettingsPage() {
           保存
         </PrimaryButton>
 
-        <div className="border-t border-[#e5e0d8] dark:border-[#333230] pt-5">
-          <h2 className="text-lg font-bold text-[#2d2a26] dark:text-[#eae7e1] mb-2">
+        <div className="border-t border-[#e5e0d8] dark:border-[#333230] pt-5 flex flex-col gap-4">
+          <h2 className="text-lg font-bold text-[#2d2a26] dark:text-[#eae7e1]">
             メンバー招待
           </h2>
-          <TextInput
-            label="メールアドレス"
-            type="email"
-            value={inviteEmail}
-            onChange={setInviteEmail}
-            placeholder="example@mail.com"
-          />
-          <div className="mt-3">
+
+          {/* 招待リンク */}
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-[#7a756d] dark:text-[#9e9a93]">
+              招待リンクを作成してシェアすると、リンクを受け取った人がグループに参加できます。
+            </p>
+            <PrimaryButton onClick={handleCreateInvite}>
+              招待リンクを作成
+            </PrimaryButton>
+            {newInviteUrl && (
+              <div className="flex items-center gap-2 rounded-xl border border-[#e5e0d8] dark:border-[#333230] p-3">
+                <span className="flex-1 text-xs text-[#4a4540] dark:text-[#c5c0b8] truncate">
+                  {newInviteUrl}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleCopyInvite(newInviteUrl)}
+                  className="shrink-0 px-3 py-1 rounded-lg text-xs font-semibold text-white bg-[#c9a227]"
+                >
+                  コピー
+                </button>
+              </div>
+            )}
+            {invitations.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-medium text-[#7a756d] dark:text-[#9e9a93]">
+                  有効な招待リンク
+                </p>
+                {invitations.map((inv) => (
+                  <div
+                    key={inv.id}
+                    className="flex items-center justify-between rounded-xl border border-[#e5e0d8] dark:border-[#333230] p-3 gap-2"
+                  >
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-xs text-[#4a4540] dark:text-[#c5c0b8] truncate">
+                        {inv.url}
+                      </span>
+                      {inv.expiresAt && (
+                        <span className="text-xs text-[#7a756d] dark:text-[#9e9a93]">
+                          {new Date(inv.expiresAt).toLocaleDateString("ja-JP")} まで有効
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyInvite(inv.url)}
+                        className="px-2 py-1 rounded-lg text-xs font-semibold border border-[#e5e0d8] dark:border-[#333230]"
+                      >
+                        コピー
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRevoke(inv.id)}
+                        className="text-xs text-red-500 underline"
+                      >
+                        無効化
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* メールアドレスで直接追加 */}
+          <div className="flex flex-col gap-3">
+            <p className="text-sm font-medium text-[#4a4540] dark:text-[#c5c0b8]">
+              メールアドレスで直接追加
+            </p>
+            <TextInput
+              label="メールアドレス"
+              type="email"
+              value={inviteEmail}
+              onChange={setInviteEmail}
+              placeholder="example@mail.com"
+            />
             <PrimaryButton onClick={handleInvite}>追加する</PrimaryButton>
           </div>
         </div>
