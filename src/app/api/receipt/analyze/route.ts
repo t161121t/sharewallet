@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import type { ReceiptAnalysisResult, CategoryName, ApiError } from "@/types";
 import { requireAuthUserId } from "@/lib/auth";
 
@@ -15,12 +14,48 @@ const CATEGORY_KEYWORDS: { keywords: string[]; category: CategoryName }[] = [
   { keywords: ["家賃", "管理費", "電気", "ガス", "水道", "住居"], category: "住居" },
 ];
 
-function inferCategory(storeName: string): CategoryName {
-  const name = storeName.toLowerCase();
+function inferCategory(text: string): CategoryName {
   for (const { keywords, category } of CATEGORY_KEYWORDS) {
-    if (keywords.some((k) => name.includes(k))) return category;
+    if (keywords.some((k) => text.includes(k))) return category;
   }
   return "その他";
+}
+
+/** OCR テキストから合計金額を抽出する */
+function extractAmount(text: string): { amount: number | null; confidence: "high" | "low" } {
+  // 明示的な合計行を優先（confidence: high）
+  const explicitPatterns = [
+    /(?:合計|お支払い|お会計|御合計|お支払金額|合\s*計)[^\d]*([0-9,，]+)/,
+    /TOTAL[^\d]*\(?税込\)?[^\d]*([0-9,，]+)/i,
+    /小計[^\d]*([0-9,，]+)/,
+  ];
+  for (const pattern of explicitPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const amount = parseInt(match[1].replace(/[,，]/g, ""), 10);
+      if (!isNaN(amount) && amount > 0) return { amount, confidence: "high" };
+    }
+  }
+
+  // フォールバック: ¥ 付きの最大金額（confidence: low）
+  const yenPattern = /[¥￥]\s*([0-9,，]+)/g;
+  const amounts: number[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = yenPattern.exec(text)) !== null) {
+    const v = parseInt(m[1].replace(/[,，]/g, ""), 10);
+    if (!isNaN(v) && v > 0) amounts.push(v);
+  }
+  if (amounts.length > 0) {
+    return { amount: Math.max(...amounts), confidence: "low" };
+  }
+
+  return { amount: null, confidence: "low" };
+}
+
+/** OCR テキストの先頭行から店名を推定する */
+function extractStoreName(text: string): string | null {
+  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 1);
+  return lines[0] ?? null;
 }
 
 export async function POST(req: NextRequest) {
@@ -35,7 +70,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.GOOGLE_CLOUD_VISION_API_KEY;
     if (!apiKey) {
       return NextResponse.json<ApiError>(
         { error: "サーバーの設定エラーです" },
@@ -43,60 +78,45 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // base64 の先頭の data URL プレフィックスを除去
-    const base64Match = body.image.match(/^data:(image\/[a-z]+);base64,(.+)$/);
-    const mediaType = (base64Match?.[1] ?? "image/jpeg") as
-      | "image/jpeg"
-      | "image/png"
-      | "image/gif"
-      | "image/webp";
-    const base64Data = base64Match ? base64Match[2] : body.image;
+    // data URL プレフィックスを除去して raw base64 を取得
+    const base64Data = body.image.replace(/^data:image\/[a-z]+;base64,/, "");
 
-    const client = new Anthropic({ apiKey });
-
-    const message = await client.messages.create({
-      model: "claude-opus-4-8",
-      max_tokens: 256,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "image",
-              source: { type: "base64", media_type: mediaType, data: base64Data },
-            },
-            {
-              type: "text",
-              text: `このレシート画像から以下の情報を抽出し、必ずJSONのみで返してください。
-
-{
-  "amount": <合計金額（数値、税込み合計・お支払い金額の数値のみ）>,
-  "storeName": "<店名（わからなければ null）>",
-  "confidence": "<high または low>"
-}
-
-ルール:
-- amount は「合計」「お支払い」「TOTAL」の金額を数値で。見つからなければ null
-- storeName はレシートに記載の店名。不明なら null
-- confidence は金額が明確に読み取れた場合 high、不確かな場合 low
-- JSON 以外のテキストは一切出力しない`,
-            },
-          ],
-        },
-      ],
-    });
-
-    const text = message.content[0].type === "text" ? message.content[0].text : "";
-    let parsed: { amount: number | null; storeName: string | null; confidence: string } | null = null;
-
-    try {
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
-    } catch {
-      // パース失敗時は null のまま
+    if (base64Data.length > 2_000_000) {
+      return NextResponse.json<ApiError>(
+        { error: "画像が大きすぎます（上限 1.5MB）" },
+        { status: 413 }
+      );
     }
 
-    if (!parsed) {
+    const visionRes = await fetch(
+      `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requests: [
+            {
+              image: { content: base64Data },
+              features: [{ type: "DOCUMENT_TEXT_DETECTION" }],
+            },
+          ],
+        }),
+        signal: AbortSignal.timeout(9000),
+      }
+    );
+
+    if (!visionRes.ok) {
+      return NextResponse.json<ApiError>(
+        { error: "レシートの解析に失敗しました" },
+        { status: 500 }
+      );
+    }
+
+    const visionData = await visionRes.json();
+    const fullText: string =
+      visionData?.responses?.[0]?.fullTextAnnotation?.text ?? "";
+
+    if (!fullText) {
       return NextResponse.json<ReceiptAnalysisResult>({
         amount: null,
         category: null,
@@ -105,14 +125,15 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const storeName = parsed.storeName ?? null;
-    const category: CategoryName | null = storeName ? inferCategory(storeName) : null;
+    const { amount, confidence } = extractAmount(fullText);
+    const storeName = extractStoreName(fullText);
+    const category: CategoryName | null = storeName ? inferCategory(fullText) : null;
 
     return NextResponse.json<ReceiptAnalysisResult>({
-      amount: typeof parsed.amount === "number" ? parsed.amount : null,
+      amount,
       category,
       memo: storeName,
-      confidence: parsed.confidence === "high" ? "high" : "low",
+      confidence,
     });
   } catch (e) {
     if (e instanceof Error && e.message === "UNAUTHORIZED") {
