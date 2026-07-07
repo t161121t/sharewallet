@@ -17,6 +17,7 @@ import type {
   ExpenseShare,
   DashboardSummary,
   SettlementResult,
+  ReceiptAnalysisResult,
 } from "@/types";
 
 /* ========== トークン管理 ========== */
@@ -333,6 +334,17 @@ export async function acceptInvitation(
     `/api/invite/${token}/accept`,
     { method: "POST" }
   );
+}
+
+/* ========== レシート解析 API ========== */
+
+export async function analyzeReceipt(
+  imageBase64: string
+): Promise<ReceiptAnalysisResult> {
+  return apiFetch<ReceiptAnalysisResult>("/api/receipt/analyze", {
+    method: "POST",
+    body: JSON.stringify({ image: imageBase64 }),
+  });
 }
 
 export { ApiClientError };

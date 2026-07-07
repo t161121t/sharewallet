@@ -153,6 +153,13 @@ export type InvitationInfo = {
   expiresAt: string | null;
 };
 
+export type ReceiptAnalysisResult = {
+  amount: number | null;
+  category: CategoryName | null;
+  memo: string | null;
+  confidence: "high" | "low";
+};
+
 export type DashboardSummary = {
   totalPersonalAmount: number;
   previousMonthTotalPersonalAmount: number;
