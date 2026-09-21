@@ -37,14 +37,6 @@ const CATEGORY_COLORS: Record<CategoryName, string> = {
   その他: "#94a3b8",
 };
 
-/** メンバー色マップ */
-const MEMBER_COLORS: Record<string, string> = {
-  u1: "#F59E0B",
-  u2: "#3B82F6",
-  u3: "#EC4899",
-  u4: "#10B981",
-};
-
 /* ---------- 日付フォーマット ---------- */
 
 function formatDate(iso: string) {
@@ -116,17 +108,19 @@ function SummaryCard({ expenses, group }: { expenses: ExpenseRecord[]; group: Gr
 
 function ExpenseItem({
   expense,
+  memberColors,
   onEdit,
   onDelete,
   canEdit,
 }: {
   expense: ExpenseRecord;
+  memberColors: Record<string, string>;
   onEdit: (expense: ExpenseRecord) => void;
   onDelete: (expenseId: string) => void;
   canEdit: boolean;
 }) {
   const color = CATEGORY_COLORS[expense.category] ?? "#94a3b8";
-  const memberColor = MEMBER_COLORS[expense.memberId] ?? "#6b7280";
+  const memberColor = memberColors[expense.memberId] ?? "#6b7280";
 
   return (
     <div className="flex items-center gap-3 py-3">
@@ -250,6 +244,10 @@ export default function HistoryPage() {
 
   const grouped = groupByDate(expenses);
   const groupId = group.id;
+  // 実際のユーザーID(cuid)をキーに、DBに保存済みのメンバーカラーを引けるようにする
+  const memberColors = Object.fromEntries(
+    group.members.map((m) => [m.id, m.color])
+  );
 
   const handleDelete = async (expenseId: string) => {
     if (!confirm("この支出を削除しますか？")) return;
@@ -335,6 +333,7 @@ export default function HistoryPage() {
                   <ExpenseItem
                     key={expense.id}
                     expense={expense}
+                    memberColors={memberColors}
                     onEdit={handleEdit}
                     onDelete={handleDelete}
                     canEdit={canManageAll || currentUserId === expense.memberId}
