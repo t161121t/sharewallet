@@ -1,9 +1,56 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { ExpenseRecord, ApiError } from "@/types";
+import type { CategoryName, ExpenseRecord, ApiError } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { assertGroupMember, requireAuthUserId } from "@/lib/auth";
 
-/** GET /api/groups/[groupId]/expenses - 支出一覧取得 */
+const VALID_CATEGORIES: CategoryName[] = [
+  "貯金", "住居", "交通", "食費", "娯楽",
+  "医療", "日用品", "通信", "美容", "教育", "その他",
+];
+
+/**
+ * クエリパラメータから絞り込み条件を組み立てる。
+ * 不正な値(パースできない日付など)は無視して「絞り込みなし」として扱う
+ * (フィルタは補助的な機能であり、不正入力のたびに400を返すよりは
+ * 全件表示にフォールバックする方がUXとして自然なため)。
+ */
+function parseExpenseFilters(searchParams: URLSearchParams) {
+  const where: {
+    date?: { gte?: Date; lt?: Date };
+    category?: CategoryName;
+    memberId?: string;
+  } = {};
+
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
+  if (from || to) {
+    const date: { gte?: Date; lt?: Date } = {};
+    if (from) {
+      const gte = new Date(from);
+      if (!Number.isNaN(gte.getTime())) date.gte = gte;
+    }
+    if (to) {
+      // to は「その日を含む」終端として扱うため、翌日0時未満(lt)で絞り込む
+      const toDate = new Date(to);
+      if (!Number.isNaN(toDate.getTime())) {
+        date.lt = new Date(toDate.getTime() + 24 * 60 * 60 * 1000);
+      }
+    }
+    if (date.gte || date.lt) where.date = date;
+  }
+
+  const category = searchParams.get("category");
+  if (category && VALID_CATEGORIES.includes(category as CategoryName)) {
+    where.category = category as CategoryName;
+  }
+
+  const memberId = searchParams.get("memberId");
+  if (memberId) where.memberId = memberId;
+
+  return where;
+}
+
+/** GET /api/groups/[groupId]/expenses - 支出一覧取得(期間・カテゴリ・メンバーで絞り込み可) */
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ groupId: string }> }
@@ -13,8 +60,10 @@ export async function GET(
     const { groupId } = await params;
     await assertGroupMember(groupId, userId);
 
+    const filters = parseExpenseFilters(req.nextUrl.searchParams);
+
     const expenses = await prisma.expense.findMany({
-      where: { groupId },
+      where: { groupId, ...filters },
       include: {
         member: { select: { id: true, name: true, avatarUrl: true } },
         shares: {

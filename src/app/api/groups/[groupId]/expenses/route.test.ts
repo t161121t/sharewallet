@@ -4,11 +4,13 @@ import { createJsonRequest, routeParams } from "@/test/helpers";
 const {
   mockFindMany,
   mockCreate,
+  mockExpenseFindMany,
   mockRequireAuthUserId,
   mockAssertGroupMember,
 } = vi.hoisted(() => ({
   mockFindMany: vi.fn(),
   mockCreate: vi.fn(),
+  mockExpenseFindMany: vi.fn(),
   mockRequireAuthUserId: vi.fn(),
   mockAssertGroupMember: vi.fn(),
 }));
@@ -16,7 +18,7 @@ const {
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     groupMember: { findMany: mockFindMany },
-    expense: { create: mockCreate },
+    expense: { create: mockCreate, findMany: mockExpenseFindMany },
   },
 }));
 
@@ -62,6 +64,65 @@ describe("GET /api/groups/[groupId]/expenses", () => {
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toEqual({
       error: "このグループの支出を閲覧する権限がありません",
+    });
+  });
+
+  describe("フィルタ", () => {
+    beforeEach(() => {
+      setupAuthenticatedMember();
+      mockExpenseFindMany.mockResolvedValue([]);
+    });
+
+    it("クエリパラメータがなければ groupId のみで絞り込む", async () => {
+      await GET(createJsonRequest(BASE_URL), params);
+
+      expect(mockExpenseFindMany).toHaveBeenCalledOnce();
+      const { where } = mockExpenseFindMany.mock.calls[0][0];
+      expect(where).toEqual({ groupId: GROUP_ID });
+    });
+
+    it("category で絞り込める", async () => {
+      await GET(createJsonRequest(`${BASE_URL}?category=食費`), params);
+
+      const { where } = mockExpenseFindMany.mock.calls[0][0];
+      expect(where).toEqual({ groupId: GROUP_ID, category: "食費" });
+    });
+
+    it("不正な category は無視される", async () => {
+      await GET(createJsonRequest(`${BASE_URL}?category=不明`), params);
+
+      const { where } = mockExpenseFindMany.mock.calls[0][0];
+      expect(where).toEqual({ groupId: GROUP_ID });
+    });
+
+    it("memberId で絞り込める", async () => {
+      await GET(createJsonRequest(`${BASE_URL}?memberId=${USER_B}`), params);
+
+      const { where } = mockExpenseFindMany.mock.calls[0][0];
+      expect(where).toEqual({ groupId: GROUP_ID, memberId: USER_B });
+    });
+
+    it("from/to で期間を絞り込める(to は翌日0時未満として扱う)", async () => {
+      await GET(
+        createJsonRequest(`${BASE_URL}?from=2026-01-01&to=2026-01-31`),
+        params
+      );
+
+      const { where } = mockExpenseFindMany.mock.calls[0][0];
+      expect(where.groupId).toBe(GROUP_ID);
+      expect(where.date.gte.toISOString()).toBe(
+        new Date("2026-01-01").toISOString()
+      );
+      expect(where.date.lt.toISOString()).toBe(
+        new Date("2026-02-01").toISOString()
+      );
+    });
+
+    it("不正な日付は無視される", async () => {
+      await GET(createJsonRequest(`${BASE_URL}?from=not-a-date`), params);
+
+      const { where } = mockExpenseFindMany.mock.calls[0][0];
+      expect(where).toEqual({ groupId: GROUP_ID });
     });
   });
 });
