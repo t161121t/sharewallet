@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import type {
-  ApiError,
   CategoryName,
   DashboardCategorySummary,
   DashboardGroupSummary,
@@ -8,6 +7,7 @@ import type {
 } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { requireAuthUserId } from "@/lib/auth";
+import { withApiErrorHandling } from "@/lib/apiError";
 
 function normalizeCategory(category: string): CategoryName {
   if (category === "交通費") return "交通";
@@ -23,8 +23,7 @@ function normalizeCategory(category: string): CategoryName {
 }
 
 /** GET /api/dashboard/summary - ホーム表示用の今月集計 */
-export async function GET(req: NextRequest) {
-  try {
+export const GET = withApiErrorHandling(async (req: NextRequest) => {
     const userId = await requireAuthUserId(req);
     const now = new Date();
     const periodFrom = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -116,13 +115,4 @@ export async function GET(req: NextRequest) {
     };
 
     return NextResponse.json<DashboardSummary>(result);
-  } catch (e) {
-    if (e instanceof Error && e.message === "UNAUTHORIZED") {
-      return NextResponse.json<ApiError>({ error: "認証が必要です" }, { status: 401 });
-    }
-    return NextResponse.json<ApiError>(
-      { error: "ホーム集計の取得に失敗しました" },
-      { status: 500 }
-    );
-  }
-}
+}, { defaultErrorMessage: "ホーム集計の取得に失敗しました" });

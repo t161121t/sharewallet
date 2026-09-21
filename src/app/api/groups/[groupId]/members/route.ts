@@ -2,13 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import type { ApiError } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { assertGroupRole, requireAuthUserId } from "@/lib/auth";
+import { withApiErrorHandling } from "@/lib/apiError";
 import { GroupRole } from "@/generated/prisma/client";
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ groupId: string }> }
-) {
-  try {
+export const POST = withApiErrorHandling<{ params: Promise<{ groupId: string }> }>(
+  async (req: NextRequest, { params }) => {
     const actorId = await requireAuthUserId(req);
     const { groupId } = await params;
     await assertGroupRole(groupId, actorId, [GroupRole.OWNER, GroupRole.ADMIN]);
@@ -59,19 +57,9 @@ export async function POST(
       },
       { status: 201 }
     );
-  } catch (e) {
-    if (e instanceof Error && e.message === "UNAUTHORIZED") {
-      return NextResponse.json<ApiError>({ error: "認証が必要です" }, { status: 401 });
-    }
-    if (e instanceof Error && e.message === "FORBIDDEN") {
-      return NextResponse.json<ApiError>(
-        { error: "メンバーを追加する権限がありません" },
-        { status: 403 }
-      );
-    }
-    return NextResponse.json<ApiError>(
-      { error: "メンバー追加に失敗しました" },
-      { status: 500 }
-    );
+  },
+  {
+    defaultErrorMessage: "メンバー追加に失敗しました",
+    forbiddenMessage: "メンバーを追加する権限がありません",
   }
-}
+);

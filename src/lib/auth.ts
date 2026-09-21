@@ -27,6 +27,22 @@ export const AUTH_COOKIE_NAME = "sharewallet_token";
  */
 export const AUTH_PRESENCE_COOKIE_NAME = "sharewallet_authed";
 
+/** 未認証(ログインが必要)を表すエラー。APIルートは withApiErrorHandling でこれを捕捉して401を返す */
+export class UnauthorizedError extends Error {
+  constructor(message = "UNAUTHORIZED") {
+    super(message);
+    this.name = "UnauthorizedError";
+  }
+}
+
+/** 権限不足(ログイン済みだがこの操作は許可されていない)を表すエラー。APIルートは withApiErrorHandling でこれを捕捉して403を返す */
+export class ForbiddenError extends Error {
+  constructor(message = "FORBIDDEN") {
+    super(message);
+    this.name = "ForbiddenError";
+  }
+}
+
 /** JWT トークン生成 */
 export async function createToken(userId: string): Promise<string> {
   return new SignJWT({ sub: userId })
@@ -89,7 +105,7 @@ export async function getAuthUserId(req: NextRequest): Promise<string | null> {
 export async function requireAuthUserId(req: NextRequest): Promise<string> {
   const userId = await getAuthUserId(req);
   if (!userId) {
-    throw new Error("UNAUTHORIZED");
+    throw new UnauthorizedError();
   }
   return userId;
 }
@@ -105,7 +121,7 @@ export async function getGroupMember(groupId: string, userId: string) {
 export async function assertGroupMember(groupId: string, userId: string) {
   const member = await getGroupMember(groupId, userId);
   if (!member) {
-    throw new Error("FORBIDDEN");
+    throw new ForbiddenError();
   }
   return member;
 }
@@ -117,7 +133,7 @@ export async function assertGroupRole(
 ) {
   const member = await assertGroupMember(groupId, userId);
   if (!allowedRoles.includes(member.role)) {
-    throw new Error("FORBIDDEN");
+    throw new ForbiddenError();
   }
   return member;
 }

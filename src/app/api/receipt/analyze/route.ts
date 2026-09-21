@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { ReceiptAnalysisResult, CategoryName, ApiError } from "@/types";
 import { requireAuthUserId } from "@/lib/auth";
+import { withApiErrorHandling } from "@/lib/apiError";
 
 const CATEGORY_KEYWORDS: { keywords: string[]; category: CategoryName }[] = [
   { keywords: ["スーパー", "コンビニ", "食料", "食品", "飲食", "レストラン", "カフェ", "ファミレス", "弁当", "惣菜", "肉", "魚", "野菜", "米", "パン", "菓子", "飲料"], category: "食費" },
@@ -58,8 +59,7 @@ function extractStoreName(text: string): string | null {
   return lines[0] ?? null;
 }
 
-export async function POST(req: NextRequest) {
-  try {
+export const POST = withApiErrorHandling(async (req: NextRequest) => {
     await requireAuthUserId(req);
     const body = await req.json().catch(() => null);
 
@@ -135,13 +135,4 @@ export async function POST(req: NextRequest) {
       memo: storeName,
       confidence,
     });
-  } catch (e) {
-    if (e instanceof Error && e.message === "UNAUTHORIZED") {
-      return NextResponse.json<ApiError>({ error: "認証が必要です" }, { status: 401 });
-    }
-    return NextResponse.json<ApiError>(
-      { error: "レシートの解析に失敗しました" },
-      { status: 500 }
-    );
-  }
-}
+}, { defaultErrorMessage: "レシートの解析に失敗しました" });
