@@ -10,8 +10,13 @@ const ALG = "HS256";
 const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7; // 7日
 
 /**
- * 認証トークンの Cookie 名。httpOnly のため JS(document.cookie)からは読めない。
- * XSS が発生してもこの Cookie 自体は窃取できない。
+ * 認証トークンの Cookie 名。httpOnly のため JS(document.cookie)からは読めず、
+ * XSSが発生してもこのCookieの値そのものを盗み出すことはできない。
+ *
+ * ただし、これはJWTの持ち出しを防ぐものであってXSSを無害化するものではない。
+ * XSSされたページ内のスクリプトは、ブラウザが自動付与するこのCookieに乗じて
+ * 同一オリジンのAPIを直接叩くことは引き続き可能(セッションライディング)。
+ * XSS自体の混入経路を塞ぐ対策とあわせて考える必要がある。
  */
 export const AUTH_COOKIE_NAME = "sharewallet_token";
 

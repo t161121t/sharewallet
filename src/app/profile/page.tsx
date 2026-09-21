@@ -162,9 +162,16 @@ export default function ProfilePage() {
   };
 
   const handleLogout = async () => {
-    await logout();
-    toast.success("ログアウトしました");
-    router.push("/home");
+    try {
+      await logout();
+      toast.success("ログアウトしました");
+      router.push("/home");
+    } catch {
+      // 認証Cookieの破棄に失敗した場合、成功したと見せかけると
+      // 認証状態が残ったまま「ログアウトできた」と誤認させてしまうため、
+      // 失敗を明示して再試行を促す。
+      toast.error("ログアウトに失敗しました。通信状態を確認して再度お試しください");
+    }
   };
 
   if (!isReady) return <RouteLoading text="プロフィールを読み込み中..." withBottomNav />;
