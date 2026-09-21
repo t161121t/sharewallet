@@ -20,27 +20,23 @@ import type {
   ReceiptAnalysisResult,
 } from "@/types";
 
-/* ========== トークン管理 ========== */
-
-const TOKEN_KEY = "sharewallet_token";
-
-export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(TOKEN_KEY);
-}
-
-export function setToken(token: string) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(TOKEN_KEY, token);
-}
-
-export function clearToken() {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(TOKEN_KEY);
-}
+/* ========== 認証状態 ==========
+ * 認証トークン本体は httpOnly Cookie(sharewallet_token)で管理し、API 呼び出し時は
+ * ブラウザが自動的に Cookie を送信するため、フロントエンドから直接読み書きしない
+ * (localStorage に置かないことで XSS によるトークン窃取を防ぐ)。
+ *
+ * ここで見ている sharewallet_authed は「ログインしているか」だけを示す非機密フラグで、
+ * トークン本体を含まない。改ざんされてもこのフラグだけでは API を通せない
+ * (実際の認可は各 API ルートが httpOnly Cookie を検証して行う)ため、
+ * UI 側のリダイレクト判定にのみ使う。
+ */
+const AUTH_PRESENCE_COOKIE_NAME = "sharewallet_authed";
 
 export function isAuthenticated(): boolean {
-  return !!getToken();
+  if (typeof document === "undefined") return false;
+  return document.cookie
+    .split("; ")
+    .some((c) => c === `${AUTH_PRESENCE_COOKIE_NAME}=1`);
 }
 
 /* ========== 選択中グループ ID の管理 ========== */
@@ -103,19 +99,16 @@ async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
 
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-
+  // 認証は httpOnly Cookie で行うため明示的に送信する(同一オリジンなら省略時も送られるが明示)
   const res = await fetch(path, {
     ...options,
     headers,
+    credentials: "include",
   });
 
   if (!res.ok) {
@@ -137,8 +130,7 @@ export async function login(
     body: JSON.stringify({ email, password }),
   });
 
-  // トークンとユーザー情報を保存
-  setToken(data.token);
+  // 認証トークンはログインAPIが Set-Cookie で払い出す。ここではUI用のユーザー情報のみキャッシュする。
   setCachedUser(data.user);
 
   return data;
@@ -155,9 +147,13 @@ export async function register(
   });
 }
 
-/** ログアウト（ローカルストレージをクリア） */
-export function logout() {
-  clearToken();
+/** ログアウト（認証 Cookie をサーバー側で破棄し、ローカルキャッシュをクリア） */
+export async function logout() {
+  await apiFetch<{ ok: boolean }>("/api/auth/logout", { method: "POST" }).catch(
+    () => {
+      // Cookie 破棄に失敗してもクライアント側のキャッシュは掃除する
+    }
+  );
   clearCachedUser();
   clearSelectedGroupId();
 }

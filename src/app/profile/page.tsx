@@ -161,8 +161,8 @@ export default function ProfilePage() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     toast.success("ログアウトしました");
     router.push("/home");
   };

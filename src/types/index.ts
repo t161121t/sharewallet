@@ -77,9 +77,8 @@ export type ExpenseWithShares = {
   shares: ExpenseShare[];
 };
 
-/** ログインレスポンス */
+/** ログインレスポンス（トークン本体は httpOnly Cookie で払い出すためレスポンスボディには含めない） */
 export type LoginResponse = {
-  token: string;
   user: UserProfile;
 };
 
