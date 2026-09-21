@@ -1,4 +1,4 @@
-# 26. BudgetDonutChart 削除まとめ
+# 27. BudgetDonutChart 削除まとめ
 
 ## これは何のドキュメント？
 
@@ -59,7 +59,7 @@ issueでは「削除する」か「実データを繋いで使う」かの2択�
 | --- | --- | --- |
 | `src/components/ui/BudgetDonutChart.tsx` | 削除 | 未使用のデッドコード |
 | `docs/11-未実装機能一覧.md` | 変更 | 項目#20を対応済みに更新 |
-| `docs/26-BudgetDonutChart削除まとめ.md` | 新規 | 本ドキュメント |
+| `docs/27-BudgetDonutChart削除まとめ.md` | 新規 | 本ドキュメント |
 
 ---
 
