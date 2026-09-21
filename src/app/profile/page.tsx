@@ -15,10 +15,13 @@ import {
   isAuthenticated,
   getMe,
   updateMe,
+  changePassword,
   logout,
   getCachedUser,
   ApiClientError,
 } from "@/lib/apiClient";
+
+const MIN_PASSWORD_LENGTH = 8;
 
 const AVATAR_COLORS = [
   "#c9a227",
@@ -44,6 +47,10 @@ export default function ProfilePage() {
   const [avatarDirty, setAvatarDirty] = useState(false);
   const [userId, setUserId] = useState("u1");
   const [saving, setSaving] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -158,6 +165,37 @@ export default function ProfilePage() {
       }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword.trim()) {
+      toast.error("現在のパスワードを入力してください");
+      return;
+    }
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      toast.error(`新しいパスワードは${MIN_PASSWORD_LENGTH}文字以上で入力してください`);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("新しいパスワードが一致しません");
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await changePassword(currentPassword, newPassword);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      toast.success("パスワードを変更しました");
+    } catch (e) {
+      if (e instanceof ApiClientError) {
+        toast.error(e.message);
+      } else {
+        toast.error("パスワードの変更に失敗しました");
+      }
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -285,6 +323,40 @@ export default function ProfilePage() {
           <PrimaryButton onClick={handleSave} loading={saving}>
             保存する
           </PrimaryButton>
+        </section>
+
+        <section className="w-full rounded-2xl border border-[#e5e0d8] dark:border-[#333230] bg-white/70 dark:bg-[#1a1917] p-5">
+          <h2 className="text-base font-bold text-[#2d2a26] dark:text-[#eae7e1] mb-4">
+            パスワード変更
+          </h2>
+          <div className="flex flex-col gap-4 w-full">
+            <TextInput
+              label="現在のパスワード"
+              type="password"
+              placeholder="現在のパスワードを入力"
+              value={currentPassword}
+              onChange={setCurrentPassword}
+            />
+            <TextInput
+              label="新しいパスワード"
+              type="password"
+              placeholder={`${MIN_PASSWORD_LENGTH}文字以上で入力`}
+              value={newPassword}
+              onChange={setNewPassword}
+            />
+            <TextInput
+              label="新しいパスワード（確認）"
+              type="password"
+              placeholder="もう一度入力"
+              value={confirmPassword}
+              onChange={setConfirmPassword}
+            />
+          </div>
+          <div className="mt-4">
+            <PrimaryButton onClick={handleChangePassword} loading={changingPassword}>
+              パスワードを変更する
+            </PrimaryButton>
+          </div>
         </section>
 
         <section className="w-full pt-1">
