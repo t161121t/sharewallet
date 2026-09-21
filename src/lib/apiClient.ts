@@ -116,9 +116,35 @@ class ApiClientError extends Error {
   }
 }
 
+// アクセストークン(JWT)は30分で失効する。401を受けたら一度だけサイレントに
+// /api/auth/refresh を試み、成功すれば元のリクエストを1回だけ再試行する。
+// login/register/refresh 自体はこの対象外(無限ループ・意味のない再試行を避ける)。
+const NO_RETRY_PATHS = ["/api/auth/login", "/api/auth/register", "/api/auth/refresh"];
+
+// 複数リクエストが同時に401になっても refresh は1回だけ実行する
+// (リフレッシュトークンはローテーションで使い捨てになるため、同時に2回呼ぶと
+// 2回目が「既に使われた古いトークン」を送ることになり失敗してしまう)。
+let refreshInFlight: Promise<boolean> | null = null;
+
+function tryRefresh(): Promise<boolean> {
+  if (!refreshInFlight) {
+    refreshInFlight = fetch("/api/auth/refresh", {
+      method: "POST",
+      credentials: "include",
+    })
+      .then((res) => res.ok)
+      .catch(() => false)
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+  return refreshInFlight;
+}
+
 async function apiFetch<T>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  isRetry = false
 ): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -131,6 +157,13 @@ async function apiFetch<T>(
     headers,
     credentials: "include",
   });
+
+  if (res.status === 401 && !isRetry && !NO_RETRY_PATHS.includes(path)) {
+    const refreshed = await tryRefresh();
+    if (refreshed) {
+      return apiFetch<T>(path, options, true);
+    }
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: "不明なエラー" }));

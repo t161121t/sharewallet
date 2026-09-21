@@ -1,3 +1,4 @@
+import { randomBytes, createHash } from "crypto";
 import { SignJWT, jwtVerify } from "jose";
 import type { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -7,7 +8,22 @@ const SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET ?? "dev-secret-change-in-production"
 );
 const ALG = "HS256";
-const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7; // 7日
+
+/**
+ * アクセストークン(JWT)の有効期限。
+ * 短命にすることで、万一トークンが漏れた場合の悪用可能な時間を短く抑える。
+ * 期限切れ後はリフレッシュトークンでの再発行(サイレントログイン継続)に任せるため、
+ * 従来の7日固定に比べてUXは損なわない。
+ */
+const ACCESS_TOKEN_TTL_SECONDS = 60 * 30; // 30分
+const ACCESS_TOKEN_TTL_JOSE = "30m";
+
+/**
+ * リフレッシュトークンの有効期限。この期間操作がなければ再ログインが必要になる。
+ * アクセストークンよりずっと長く保つのがリフレッシュトークンの目的そのものなので、
+ * 従来のアクセストークン有効期限(7日)よりもさらに長い30日とした。
+ */
+const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30; // 30日
 
 /**
  * 認証トークンの Cookie 名。httpOnly のため JS(document.cookie)からは読めず、
@@ -27,12 +43,20 @@ export const AUTH_COOKIE_NAME = "sharewallet_token";
  */
 export const AUTH_PRESENCE_COOKIE_NAME = "sharewallet_authed";
 
-/** JWT トークン生成 */
+/**
+ * リフレッシュトークンの Cookie 名。httpOnly。
+ * `path: "/api/auth"` に限定して発行し、リフレッシュ・ログアウト以外のAPIリクエストには
+ * 送信されないようにすることで、この長命なトークンが晒される範囲を最小限に絞っている。
+ */
+export const REFRESH_COOKIE_NAME = "sharewallet_refresh_token";
+const REFRESH_COOKIE_PATH = "/api/auth";
+
+/** アクセストークン(JWT)生成 */
 export async function createToken(userId: string): Promise<string> {
   return new SignJWT({ sub: userId })
     .setProtectedHeader({ alg: ALG })
     .setIssuedAt()
-    .setExpirationTime("7d")
+    .setExpirationTime(ACCESS_TOKEN_TTL_JOSE)
     .sign(SECRET);
 }
 
@@ -46,30 +70,97 @@ export async function verifyToken(token: string): Promise<string | null> {
   }
 }
 
-/** ログイン成功時に認証 Cookie をレスポンスへ付与する */
-export function setAuthCookies(res: NextResponse, token: string) {
+function hashRefreshToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+/**
+ * リフレッシュトークンを新規発行しDBに保存する(ハッシュのみ保存)。
+ * 生の値は呼び出し元がCookieとして返す用にのみ使う。
+ */
+export async function issueRefreshToken(userId: string): Promise<string> {
+  const token = randomBytes(32).toString("base64url");
+  const tokenHash = hashRefreshToken(token);
+  const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000);
+  await prisma.refreshToken.create({ data: { userId, tokenHash, expiresAt } });
+  return token;
+}
+
+/**
+ * リフレッシュトークンを検証し、有効なら「使い捨て」にして新しいトークンを発行し直す
+ * (ローテーション)。同じトークンでの再利用(リプレイ)を防ぐため、検証成功時は
+ * 古いトークンを必ず削除してから新しいトークンを発行する。
+ *
+ * 戻り値が null の場合(未登録・期限切れ)は呼び出し元で401として扱うこと。
+ */
+export async function rotateRefreshToken(
+  oldToken: string
+): Promise<{ userId: string; token: string } | null> {
+  const oldHash = hashRefreshToken(oldToken);
+  const existing = await prisma.refreshToken.findUnique({
+    where: { tokenHash: oldHash },
+  });
+
+  if (!existing) return null;
+
+  // 期限切れ・有効いずれの場合も、この値は使い終わりなので必ず削除する
+  await prisma.refreshToken.delete({ where: { id: existing.id } }).catch(() => undefined);
+
+  if (existing.expiresAt <= new Date()) return null;
+
+  const newToken = await issueRefreshToken(existing.userId);
+  return { userId: existing.userId, token: newToken };
+}
+
+/** ログアウト・失効時に特定のリフレッシュトークンをDBから削除する */
+export async function revokeRefreshToken(token: string): Promise<void> {
+  const tokenHash = hashRefreshToken(token);
+  await prisma.refreshToken.deleteMany({ where: { tokenHash } });
+}
+
+/** ログイン成功時・リフレッシュ成功時に認証 Cookie 一式をレスポンスへ付与する */
+export function setAuthCookies(
+  res: NextResponse,
+  accessToken: string,
+  refreshToken: string
+) {
   const isProd = process.env.NODE_ENV === "production";
-  res.cookies.set(AUTH_COOKIE_NAME, token, {
+  res.cookies.set(AUTH_COOKIE_NAME, accessToken, {
     httpOnly: true,
     secure: isProd,
     sameSite: "lax",
     path: "/",
-    maxAge: TOKEN_TTL_SECONDS,
+    maxAge: ACCESS_TOKEN_TTL_SECONDS,
   });
+  res.cookies.set(REFRESH_COOKIE_NAME, refreshToken, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: "lax",
+    path: REFRESH_COOKIE_PATH,
+    maxAge: REFRESH_TOKEN_TTL_SECONDS,
+  });
+  // 「ログインしているか」の非機密フラグはリフレッシュトークンと同じ期間持たせる。
+  // アクセストークンの30分に合わせてしまうと、リフレッシュでサイレントに継続できる
+  // はずのセッションなのに、UI側が30分でログアウト扱いにしてしまうため。
   res.cookies.set(AUTH_PRESENCE_COOKIE_NAME, "1", {
     httpOnly: false,
     secure: isProd,
     sameSite: "lax",
     path: "/",
-    maxAge: TOKEN_TTL_SECONDS,
+    maxAge: REFRESH_TOKEN_TTL_SECONDS,
   });
 }
 
-/** ログアウト時に認証 Cookie を破棄する */
+/** ログアウト時に認証 Cookie 一式を破棄する */
 export function clearAuthCookies(res: NextResponse) {
   res.cookies.set(AUTH_COOKIE_NAME, "", {
     httpOnly: true,
     path: "/",
+    maxAge: 0,
+  });
+  res.cookies.set(REFRESH_COOKIE_NAME, "", {
+    httpOnly: true,
+    path: REFRESH_COOKIE_PATH,
     maxAge: 0,
   });
   res.cookies.set(AUTH_PRESENCE_COOKIE_NAME, "", {

@@ -35,6 +35,7 @@ model User {
   expenses           Expense[]
   shares             ExpenseShare[]
   createdInvitations GroupInvitation[]
+  refreshTokens      RefreshToken[]
 
   @@map("users")
 }
@@ -109,6 +110,22 @@ model RateLimitEntry {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("rate_limit_entries")
+}
+
+/// リフレッシュトークン。値そのものは保存せずSHA-256ハッシュのみ保存する
+/// (パスワードと同じ「漏洩時に生の値を復元できない」原則。頻繁に照合するため
+/// bcryptのような低速ハッシュではなく高エントロピーな乱数値へのsha256を使う)。
+/// 1トークン=1行で、リフレッシュのたびに削除して新しい行を作る(ローテーション)。
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
 }
 
 model GroupInvitation {
