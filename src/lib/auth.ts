@@ -3,9 +3,20 @@ import type { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { GroupRole } from "@/generated/prisma/client";
 
-const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET ?? "dev-secret-change-in-production"
-);
+const JWT_SECRET_ENV = process.env.JWT_SECRET;
+// 開発環境でのみ使う既知のデフォルト値。本番でこれが有効になると、
+// 誰でもこの文字列でJWTを偽造しログイン状態を乗っ取れてしまうため、
+// 本番(NODE_ENV=production)では絶対に使わせない(下のチェックでfail-closed)。
+const DEV_ONLY_FALLBACK_SECRET = "dev-secret-change-in-production";
+
+if (!JWT_SECRET_ENV && process.env.NODE_ENV === "production") {
+  throw new Error(
+    "JWT_SECRET が設定されていません。本番環境では既知のデフォルト値へのフォールバックを許可していないため、" +
+      "環境変数 JWT_SECRET に十分な長さのランダムな値を設定してください。"
+  );
+}
+
+const SECRET = new TextEncoder().encode(JWT_SECRET_ENV ?? DEV_ONLY_FALLBACK_SECRET);
 const ALG = "HS256";
 const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7; // 7日
 
