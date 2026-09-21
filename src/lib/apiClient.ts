@@ -20,27 +20,44 @@ import type {
   ReceiptAnalysisResult,
 } from "@/types";
 
-/* ========== トークン管理 ========== */
+/* ========== 認証状態 ==========
+ * 認証トークン本体は httpOnly Cookie(sharewallet_token)で管理し、API 呼び出し時は
+ * ブラウザが自動的に Cookie を送信するため、フロントエンドから直接読み書きしない。
+ *
+ * 注意: これは「XSSが起きてもJWT自体を直接読み出されにくくする」対策であり、
+ * XSSそのものを無害化するものではない。XSSされたページから同一オリジンのAPIを
+ * 叩くこと(Cookieが自動付与された状態でのリクエスト)自体は引き続き可能であるため、
+ * 根本対策には別途 XSS の混入経路自体を塞ぐ(出力エスケープ・CSP等)必要がある。
+ *
+ * ここで見ている sharewallet_authed は「ログインしているか」だけを示す非機密フラグで、
+ * トークン本体を含まない。改ざんされてもこのフラグだけでは API を通せない
+ * (実際の認可は各 API ルートが httpOnly Cookie を検証して行う)ため、
+ * UI 側のリダイレクト判定にのみ使う。
+ */
+const AUTH_PRESENCE_COOKIE_NAME = "sharewallet_authed";
 
-const TOKEN_KEY = "sharewallet_token";
+/** 移行前(httpOnly Cookie化より前)に localStorage へ保存されていた認証トークンのキー */
+const LEGACY_TOKEN_KEY = "sharewallet_token";
 
-export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(TOKEN_KEY);
-}
-
-export function setToken(token: string) {
+/**
+ * 移行前にログインしたブラウザには、旧実装が localStorage に書き込んだ JWT が
+ * 残っている可能性がある。これは XSS で読み出せてしまい、発行から7日間は
+ * Cookie 側と同じ有効期限で使えてしまうため、見つけ次第削除する。
+ */
+function purgeLegacyToken() {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(TOKEN_KEY, token);
+  window.localStorage.removeItem(LEGACY_TOKEN_KEY);
 }
 
-export function clearToken() {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(TOKEN_KEY);
-}
+// このモジュールが読み込まれた時点(=アプリ起動・各ページ表示時)で一度だけ実行し、
+// ログイン/ログアウトを経由しないユーザーの端末に残った旧トークンも掃除する。
+purgeLegacyToken();
 
 export function isAuthenticated(): boolean {
-  return !!getToken();
+  if (typeof document === "undefined") return false;
+  return document.cookie
+    .split("; ")
+    .some((c) => c === `${AUTH_PRESENCE_COOKIE_NAME}=1`);
 }
 
 /* ========== 選択中グループ ID の管理 ========== */
@@ -103,19 +120,16 @@ async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
 
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-
+  // 認証は httpOnly Cookie で行うため明示的に送信する(同一オリジンなら省略時も送られるが明示)
   const res = await fetch(path, {
     ...options,
     headers,
+    credentials: "include",
   });
 
   if (!res.ok) {
@@ -137,9 +151,9 @@ export async function login(
     body: JSON.stringify({ email, password }),
   });
 
-  // トークンとユーザー情報を保存
-  setToken(data.token);
+  // 認証トークンはログインAPIが Set-Cookie で払い出す。ここではUI用のユーザー情報のみキャッシュする。
   setCachedUser(data.user);
+  purgeLegacyToken();
 
   return data;
 }
@@ -155,11 +169,20 @@ export async function register(
   });
 }
 
-/** ログアウト（ローカルストレージをクリア） */
-export function logout() {
-  clearToken();
+/**
+ * ログアウト（認証 Cookie をサーバー側で破棄し、ローカルキャッシュをクリア）
+ *
+ * httpOnly Cookie はクライアントJSから削除できないため、サーバーの
+ * `/api/auth/logout` が成功して初めて実際にログアウト状態になる。
+ * ここで失敗を握りつぶして成功したことにすると、共有端末などで
+ * 「ログアウトしたつもりが実際は認証Cookieが有効なまま残る」状態になり得るため、
+ * 失敗時は呼び出し側にエラーを伝播し、ローカルキャッシュもクリアしない。
+ */
+export async function logout() {
+  await apiFetch<{ ok: boolean }>("/api/auth/logout", { method: "POST" });
   clearCachedUser();
   clearSelectedGroupId();
+  purgeLegacyToken();
 }
 
 /* ========== ユーザー API ========== */

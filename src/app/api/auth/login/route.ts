@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import type { LoginResponse, ApiError } from "@/types";
 import { prisma } from "@/lib/prisma";
-import { createToken } from "@/lib/auth";
+import { createToken, setAuthCookies } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -27,8 +27,7 @@ export async function POST(req: NextRequest) {
 
   const token = await createToken(user.id);
 
-  return NextResponse.json<LoginResponse>({
-    token,
+  const res = NextResponse.json<LoginResponse>({
     user: {
       id: user.id,
       name: user.name,
@@ -37,4 +36,6 @@ export async function POST(req: NextRequest) {
       avatarUrl: user.avatarUrl ?? undefined,
     },
   });
+  setAuthCookies(res, token);
+  return res;
 }

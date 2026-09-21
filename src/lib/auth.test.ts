@@ -17,15 +17,16 @@ vi.mock("@/lib/prisma", () => ({
 import {
   assertGroupMember,
   assertGroupRole,
+  AUTH_COOKIE_NAME,
   createToken,
   getAuthUserId,
   requireAuthUserId,
   verifyToken,
 } from "@/lib/auth";
 
-function bearerRequest(token: string): NextRequest {
+function cookieRequest(token: string): NextRequest {
   return new NextRequest("http://localhost/api/test", {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Cookie: `${AUTH_COOKIE_NAME}=${token}` },
   });
 }
 
@@ -39,21 +40,21 @@ describe("auth JWT", () => {
     await expect(verifyToken("invalid.token.value")).resolves.toBeNull();
   });
 
-  it("Authorization ヘッダーがないと getAuthUserId は null", async () => {
+  it("認証 Cookie がないと getAuthUserId は null", async () => {
     const req = new NextRequest("http://localhost/api/test");
     await expect(getAuthUserId(req)).resolves.toBeNull();
   });
 
-  it("Bearer 以外の形式では getAuthUserId は null", async () => {
+  it("値が不正な Cookie では getAuthUserId は null", async () => {
     const req = new NextRequest("http://localhost/api/test", {
-      headers: { Authorization: "Token abc" },
+      headers: { Cookie: `${AUTH_COOKIE_NAME}=not-a-valid-token` },
     });
     await expect(getAuthUserId(req)).resolves.toBeNull();
   });
 
-  it("有効な Bearer トークンから userId を取得できる", async () => {
+  it("有効な認証 Cookie から userId を取得できる", async () => {
     const token = await createToken("user-abc");
-    await expect(getAuthUserId(bearerRequest(token))).resolves.toBe("user-abc");
+    await expect(getAuthUserId(cookieRequest(token))).resolves.toBe("user-abc");
   });
 
   it("未認証の requireAuthUserId は UNAUTHORIZED を投げる", async () => {
