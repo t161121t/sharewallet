@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
@@ -10,6 +10,7 @@ import BottomNav from "@/components/layout/BottomNav";
 import RouteLoading from "@/components/layout/RouteLoading";
 import CategoryIcon from "@/components/icons/CategoryIcon";
 import GroupAvatar from "@/components/ui/GroupAvatar";
+import GenreSelect from "@/components/ui/GenreSelect";
 import type { Group, ExpenseRecord, CategoryName } from "@/types";
 import {
   isAuthenticated,
@@ -20,7 +21,44 @@ import {
   updateExpense,
   deleteExpense,
   ApiClientError,
+  type ExpenseFilters,
 } from "@/lib/apiClient";
+
+/* ---------- 期間フィルタ ---------- */
+
+type PeriodMode = "all" | "thisMonth" | "lastMonth" | "custom";
+
+function toDateInputValue(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** 選択中の期間モードから API に渡す from/to(YYYY-MM-DD)を計算する */
+function resolvePeriodRange(
+  mode: PeriodMode,
+  customFrom: string,
+  customTo: string
+): { from?: string; to?: string } {
+  const now = new Date();
+  if (mode === "thisMonth") {
+    return {
+      from: toDateInputValue(new Date(now.getFullYear(), now.getMonth(), 1)),
+      to: toDateInputValue(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+    };
+  }
+  if (mode === "lastMonth") {
+    return {
+      from: toDateInputValue(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
+      to: toDateInputValue(new Date(now.getFullYear(), now.getMonth(), 0)),
+    };
+  }
+  if (mode === "custom") {
+    return { from: customFrom || undefined, to: customTo || undefined };
+  }
+  return {};
+}
 
 /** カテゴリの色マップ */
 const CATEGORY_COLORS: Record<CategoryName, string> = {
@@ -216,6 +254,14 @@ export default function HistoryPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [canManageAll, setCanManageAll] = useState(false);
 
+  // ---- フィルタ状態(期間・カテゴリ・メンバー) ----
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<CategoryName | "">("");
+  const [memberFilter, setMemberFilter] = useState("");
+  const isFirstFilterRun = useRef(true);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!isAuthenticated()) {
@@ -229,7 +275,7 @@ export default function HistoryPage() {
       return;
     }
 
-    // API からグループ情報と支出一覧を並行取得
+    // API からグループ情報と支出一覧(絞り込みなし)を並行取得
     Promise.all([getGroup(groupId), getExpenses(groupId), getMe()])
       .then(([groupData, expensesData, me]) => {
         setGroup(groupData);
@@ -243,6 +289,25 @@ export default function HistoryPage() {
         router.replace("/dashboard");
       });
   }, [router]);
+
+  // フィルタ条件が変わったら支出一覧だけ再取得する(初回マウント時は上の
+  // effectで既に全件取得済みなので、二重フェッチにならないようスキップする)
+  useEffect(() => {
+    if (!isReady || !group) return;
+    if (isFirstFilterRun.current) {
+      isFirstFilterRun.current = false;
+      return;
+    }
+    const range = resolvePeriodRange(periodMode, customFrom, customTo);
+    const filters: ExpenseFilters = {
+      ...range,
+      category: categoryFilter || undefined,
+      memberId: memberFilter || undefined,
+    };
+    getExpenses(group.id, filters)
+      .then(setExpenses)
+      .catch(() => toast.error("支出の絞り込みに失敗しました"));
+  }, [isReady, group, periodMode, customFrom, customTo, categoryFilter, memberFilter]);
 
   if (!isReady || !group) {
     return <RouteLoading text="履歴を読み込み中..." withBottomNav />;
@@ -318,6 +383,80 @@ export default function HistoryPage() {
         <h2 className="text-lg font-bold text-[#2d2a26] dark:text-[#eae7e1] mt-6 mb-2">
           支出履歴
         </h2>
+
+        <div className="flex flex-col gap-3 mb-3">
+          <div className="flex gap-2 overflow-x-auto">
+            {(
+              [
+                { mode: "all", label: "すべて" },
+                { mode: "thisMonth", label: "今月" },
+                { mode: "lastMonth", label: "先月" },
+                { mode: "custom", label: "カスタム" },
+              ] as { mode: PeriodMode; label: string }[]
+            ).map((opt) => (
+              <button
+                key={opt.mode}
+                type="button"
+                onClick={() => setPeriodMode(opt.mode)}
+                className={[
+                  "shrink-0 h-8 px-3 rounded-full text-xs font-semibold border transition-colors",
+                  periodMode === opt.mode
+                    ? "bg-[#c9a227] border-[#c9a227] text-white"
+                    : "border-[#e5e0d8] dark:border-[#333230] text-[#7a756d] dark:text-[#9e9a93]",
+                ].join(" ")}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {periodMode === "custom" && (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="flex-1 h-10 rounded-lg px-3 border border-[#e5e0d8] dark:border-[#333230] bg-white dark:bg-[#1c1b19] text-sm"
+                aria-label="開始日"
+              />
+              <span className="text-[#9e9a93]">〜</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="flex-1 h-10 rounded-lg px-3 border border-[#e5e0d8] dark:border-[#333230] bg-white dark:bg-[#1c1b19] text-sm"
+                aria-label="終了日"
+              />
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <GenreSelect
+                value={categoryFilter}
+                onChange={(v) => setCategoryFilter(v as CategoryName | "")}
+              />
+            </div>
+            <label className="flex-1">
+              <div className="text-base font-medium text-[#4a4540] dark:text-[#c5c0b8] mb-2">
+                メンバー
+              </div>
+              <select
+                value={memberFilter}
+                onChange={(e) => setMemberFilter(e.target.value)}
+                className="w-full h-13 rounded-xl px-4 outline-none appearance-none cursor-pointer text-base bg-white dark:bg-[#1c1b19] border border-[#e5e0d8] dark:border-[#333230] text-[#2d2a26] dark:text-[#eae7e1] focus:ring-2 focus:ring-[#c9a227] focus:border-[#c9a227]"
+                aria-label="メンバーで絞り込み"
+              >
+                <option value="">すべてのメンバー</option>
+                {group.members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
 
         <div className="flex flex-col gap-1">
           {grouped.map(([dateKey, items]) => (

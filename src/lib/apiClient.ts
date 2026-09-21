@@ -265,8 +265,28 @@ export async function removeMember(
 
 /* ========== 支出 API ========== */
 
-export async function getExpenses(groupId: string): Promise<ExpenseRecord[]> {
-  return apiFetch<ExpenseRecord[]>(`/api/groups/${groupId}/expenses`);
+export type ExpenseFilters = {
+  /** 期間の開始日(YYYY-MM-DD、この日を含む) */
+  from?: string;
+  /** 期間の終了日(YYYY-MM-DD、この日を含む) */
+  to?: string;
+  category?: CategoryName;
+  memberId?: string;
+};
+
+export async function getExpenses(
+  groupId: string,
+  filters?: ExpenseFilters
+): Promise<ExpenseRecord[]> {
+  const query = new URLSearchParams();
+  if (filters?.from) query.set("from", filters.from);
+  if (filters?.to) query.set("to", filters.to);
+  if (filters?.category) query.set("category", filters.category);
+  if (filters?.memberId) query.set("memberId", filters.memberId);
+  const qs = query.toString();
+  return apiFetch<ExpenseRecord[]>(
+    `/api/groups/${groupId}/expenses${qs ? `?${qs}` : ""}`
+  );
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
