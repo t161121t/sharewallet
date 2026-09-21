@@ -170,3 +170,14 @@ export type DashboardSummary = {
     label: string;
   };
 };
+
+export type MonthlyTrendPoint = {
+  year: number;
+  month: number;
+  label: string;
+  totalPersonalAmount: number;
+};
+
+export type MonthlyTrendResult = {
+  points: MonthlyTrendPoint[];
+};

@@ -1,36 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
-import type {
-  ApiError,
-  CategoryName,
-  DashboardCategorySummary,
-  DashboardGroupSummary,
-  DashboardSummary,
-} from "@/types";
+import type { ApiError, DashboardSummary } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { requireAuthUserId } from "@/lib/auth";
+import {
+  aggregateByGroupAndCategory,
+  getMonthRange,
+  getPreviousMonth,
+} from "@/lib/dashboardAggregation";
 
-function normalizeCategory(category: string): CategoryName {
-  if (category === "交通費") return "交通";
-  if (category === "住居費") return "住居";
-  if (category === "通信費") return "通信";
-  if (category === "医療費") return "医療";
-  const valid: CategoryName[] = [
-    "貯金", "住居", "交通", "食費", "娯楽",
-    "医療", "日用品", "通信", "美容", "教育", "その他",
-  ];
-  if (valid.includes(category as CategoryName)) return category as CategoryName;
-  return "その他";
+function parseYearMonth(req: NextRequest): { year: number; month: number } | { error: string } {
+  const now = new Date();
+  const yearParam = req.nextUrl.searchParams.get("year");
+  const monthParam = req.nextUrl.searchParams.get("month");
+
+  if (yearParam === null && monthParam === null) {
+    return { year: now.getFullYear(), month: now.getMonth() + 1 };
+  }
+
+  const year = Number(yearParam ?? now.getFullYear());
+  const month = Number(monthParam ?? now.getMonth() + 1);
+
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+    return { error: "year・monthの指定が不正です" };
+  }
+
+  return { year, month };
 }
 
-/** GET /api/dashboard/summary - ホーム表示用の今月集計 */
+/** GET /api/dashboard/summary?year=&month= - ホーム表示用の指定月集計(省略時は今月) */
 export async function GET(req: NextRequest) {
   try {
     const userId = await requireAuthUserId(req);
-    const now = new Date();
-    const periodFrom = new Date(now.getFullYear(), now.getMonth(), 1);
-    const periodTo = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    const prevFrom = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const prevTo = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const parsed = parseYearMonth(req);
+    if ("error" in parsed) {
+      return NextResponse.json<ApiError>({ error: parsed.error }, { status: 400 });
+    }
+    const { year, month } = parsed;
+
+    const { from: periodFrom, to: periodTo } = getMonthRange(year, month);
+    const prev = getPreviousMonth(year, month);
+    const { from: prevFrom, to: prevTo } = getMonthRange(prev.year, prev.month);
 
     const expenses = await prisma.expense.findMany({
       where: {
@@ -71,37 +81,10 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const groupMap = new Map<string, DashboardGroupSummary>();
-    const categoryMap = new Map<CategoryName, number>();
+    const { totalPersonalAmount, byGroup, byCategory } = aggregateByGroupAndCategory(expenses);
 
-    let totalPersonalAmount = 0;
-
-    for (const expense of expenses) {
-      totalPersonalAmount += expense.amount;
-
-      const existingGroup = groupMap.get(expense.group.id);
-      if (existingGroup) {
-        existingGroup.amount += expense.amount;
-      } else {
-        groupMap.set(expense.group.id, {
-          groupId: expense.group.id,
-          groupName: expense.group.name,
-          groupColor: expense.group.color,
-          amount: expense.amount,
-        });
-      }
-
-      const normalizedCategory = normalizeCategory(expense.category);
-      categoryMap.set(
-        normalizedCategory,
-        (categoryMap.get(normalizedCategory) ?? 0) + expense.amount
-      );
-    }
-
-    const byGroup = Array.from(groupMap.values()).sort((a, b) => b.amount - a.amount);
-    const byCategory: DashboardCategorySummary[] = Array.from(categoryMap.entries())
-      .map(([category, amount]) => ({ category, amount }))
-      .sort((a, b) => b.amount - a.amount);
+    const now = new Date();
+    const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
 
     const result: DashboardSummary = {
       totalPersonalAmount,
@@ -111,7 +94,7 @@ export async function GET(req: NextRequest) {
       period: {
         from: periodFrom.toISOString(),
         to: periodTo.toISOString(),
-        label: "今月",
+        label: isCurrentMonth ? "今月" : `${year}年${month}月`,
       },
     };
 

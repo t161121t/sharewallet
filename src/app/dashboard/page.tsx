@@ -10,12 +10,14 @@ import RouteLoading from "@/components/layout/RouteLoading";
 import Logo from "@/components/ui/Logo";
 import CategoryIcon from "@/components/icons/CategoryIcon";
 import GroupAvatar from "@/components/ui/GroupAvatar";
-import type { CategoryName, DashboardSummary, Group } from "@/types";
+import MonthlyTrendChart from "@/components/ui/MonthlyTrendChart";
+import type { CategoryName, DashboardSummary, Group, MonthlyTrendResult } from "@/types";
 
 import {
   isAuthenticated,
   getGroups,
   getDashboardSummary,
+  getDashboardTrend,
 } from "@/lib/apiClient";
 
 function lightBg(hex: string, opacity = 0.10) {
@@ -43,16 +45,28 @@ const CATEGORY_COLORS: Record<CategoryName, string> = {
   その他: "#94a3b8",
 };
 
-type DashboardTab = "overview" | "groups" | "categories";
+type DashboardTab = "overview" | "groups" | "categories" | "trend";
+
+function shiftMonth(year: number, month: number, delta: number) {
+  const d = new Date(year, month - 1 + delta, 1);
+  return { year: d.getFullYear(), month: d.getMonth() + 1 };
+}
 
 export default function DashboardPage() {
   const router = useRouter();
+  const now = useMemo(() => new Date(), []);
   const [isReady, setIsReady] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
   const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
+  const [viewYear, setViewYear] = useState(now.getFullYear());
+  const [viewMonth, setViewMonth] = useState(now.getMonth() + 1);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [trend, setTrend] = useState<MonthlyTrendResult | null>(null);
   const [animatedGroupTotal, setAnimatedGroupTotal] = useState(0);
+
+  const isCurrentMonth = viewYear === now.getFullYear() && viewMonth === now.getMonth() + 1;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -61,10 +75,11 @@ export default function DashboardPage() {
       return;
     }
 
-    Promise.all([getGroups(), getDashboardSummary()])
-      .then(([groupData, summaryData]) => {
+    Promise.all([getGroups(), getDashboardSummary(), getDashboardTrend(6)])
+      .then(([groupData, summaryData, trendData]) => {
         setGroups(groupData);
         setSummary(summaryData);
+        setTrend(trendData);
         setIsReady(true);
       })
       .catch(() => {
@@ -79,6 +94,22 @@ export default function DashboardPage() {
           });
       });
   }, [router]);
+
+  const handleMonthShift = (delta: number) => {
+    const next = shiftMonth(viewYear, viewMonth, delta);
+    setViewYear(next.year);
+    setViewMonth(next.month);
+    setSummaryLoading(true);
+    setSummaryError(null);
+    getDashboardSummary(next)
+      .then((summaryData) => {
+        setSummary(summaryData);
+      })
+      .catch(() => {
+        setSummaryError("集計の取得に失敗しました");
+      })
+      .finally(() => setSummaryLoading(false));
+  };
 
   const groupIconMap = useMemo(
     () => new Map(groups.map((g) => [g.id, g.iconUrl] as const)),
@@ -132,12 +163,39 @@ export default function DashboardPage() {
           {summary?.period.label ?? "今月"}のあなたの支出を確認できます
         </p>
 
+        {activeTab !== "trend" && (
+          <div className="w-full flex items-center justify-between mb-3">
+            <button
+              type="button"
+              onClick={() => handleMonthShift(-1)}
+              disabled={summaryLoading}
+              aria-label="前の月"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-[#7a756d] dark:text-[#9e9a93] hover:bg-[#f6f2ea] dark:hover:bg-[#2b2926] disabled:opacity-40"
+            >
+              ‹
+            </button>
+            <span className="text-sm font-semibold text-[#2d2a26] dark:text-[#eae7e1] tabular-nums">
+              {summary?.period.label ?? "今月"}
+            </span>
+            <button
+              type="button"
+              onClick={() => handleMonthShift(1)}
+              disabled={summaryLoading || isCurrentMonth}
+              aria-label="次の月"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-[#7a756d] dark:text-[#9e9a93] hover:bg-[#f6f2ea] dark:hover:bg-[#2b2926] disabled:opacity-40"
+            >
+              ›
+            </button>
+          </div>
+        )}
+
         <div className="w-full rounded-2xl bg-white/80 dark:bg-[#1c1b19]/80 border border-[#ece7de] dark:border-[#2f2d2a] p-1 mb-4">
-          <div className="grid grid-cols-3 gap-1">
+          <div className="grid grid-cols-4 gap-1">
             {[
               { key: "overview", label: "全体" },
               { key: "groups", label: "グループ" },
               { key: "categories", label: "ジャンル" },
+              { key: "trend", label: "推移" },
             ].map((tab) => {
               const isActive = activeTab === tab.key;
               return (
@@ -468,7 +526,30 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {activeTab !== "categories" && (
+        {activeTab === "trend" && (
+          <div className="w-full flex flex-col gap-3 mb-5">
+            {trend && trend.points.some((p) => p.totalPersonalAmount > 0) ? (
+              <div className="rounded-2xl border border-[#dfd7c9] dark:border-[#3a3732] bg-white dark:bg-[#1f1d1a] p-4">
+                <p className="text-xs text-[#6f6a62] dark:text-[#b1aba2] mb-2">
+                  直近{trend.points.length}ヶ月の個人支出推移
+                </p>
+                <MonthlyTrendChart points={trend.points} />
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-[#ddd6c8] dark:border-[#3c3a36] px-5 py-10 text-center">
+                <p className="text-4xl mb-3">📈</p>
+                <p className="text-sm font-medium text-[#8c867d] dark:text-[#8f8a84]">
+                  まだ推移を表示できるデータがありません
+                </p>
+                <p className="text-xs text-[#b5b0a8] dark:text-[#5c5955] mt-1">
+                  支出を登録すると、ここに月ごとの推移が表示されます
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab !== "categories" && activeTab !== "trend" && (
           <div className="w-full mb-4">
             <Link
               href="/groups/new"
