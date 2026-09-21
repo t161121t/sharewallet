@@ -28,7 +28,10 @@ export async function POST(req: NextRequest) {
   }
 
   const ip = getClientIp(req);
-  const email = String(body.email).toLowerCase();
+  // 実際の認証(下の findUnique)がメールアドレスを大文字小文字区別のまま照合するため、
+  // レート制限のキーも正規化(lowercase等)せず同じ表現を使う。ここで正規化してしまうと
+  // 大文字小文字違いの別アカウント(DB上は別ユニーク値)同士が制限を共有してしまう。
+  const email = String(body.email);
 
   const ipCheck = await consumeRateLimit(`login:ip:${ip}`, IP_LIMIT);
   if (!ipCheck.allowed) return tooManyRequests(ipCheck.retryAfterSeconds);
