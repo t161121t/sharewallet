@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import type { ExpenseRecord, ApiError } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { assertGroupMember, requireAuthUserId } from "@/lib/auth";
+import { withApiErrorHandling } from "@/lib/apiError";
+
+type RouteContext = { params: Promise<{ groupId: string }> };
 
 /** GET /api/groups/[groupId]/expenses - 支出一覧取得 */
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ groupId: string }> }
-) {
-  try {
+export const GET = withApiErrorHandling<RouteContext>(
+  async (req: NextRequest, { params }) => {
     const userId = await requireAuthUserId(req);
     const { groupId } = await params;
     await assertGroupMember(groupId, userId);
@@ -42,29 +42,16 @@ export async function GET(
     }));
 
     return NextResponse.json<ExpenseRecord[]>(result);
-  } catch (e) {
-    if (e instanceof Error && e.message === "UNAUTHORIZED") {
-      return NextResponse.json<ApiError>({ error: "認証が必要です" }, { status: 401 });
-    }
-    if (e instanceof Error && e.message === "FORBIDDEN") {
-      return NextResponse.json<ApiError>(
-        { error: "このグループの支出を閲覧する権限がありません" },
-        { status: 403 }
-      );
-    }
-    return NextResponse.json<ApiError>(
-      { error: "支出一覧取得に失敗しました" },
-      { status: 500 }
-    );
+  },
+  {
+    defaultErrorMessage: "支出一覧取得に失敗しました",
+    forbiddenMessage: "このグループの支出を閲覧する権限がありません",
   }
-}
+);
 
 /** POST /api/groups/[groupId]/expenses - 支出登録 */
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ groupId: string }> }
-) {
-  try {
+export const POST = withApiErrorHandling<RouteContext>(
+  async (req: NextRequest, { params }) => {
     const userId = await requireAuthUserId(req);
     const { groupId } = await params;
     await assertGroupMember(groupId, userId);
@@ -148,19 +135,9 @@ export async function POST(
     };
 
     return NextResponse.json<ExpenseRecord>(result, { status: 201 });
-  } catch (e) {
-    if (e instanceof Error && e.message === "UNAUTHORIZED") {
-      return NextResponse.json<ApiError>({ error: "認証が必要です" }, { status: 401 });
-    }
-    if (e instanceof Error && e.message === "FORBIDDEN") {
-      return NextResponse.json<ApiError>(
-        { error: "このグループに支出を登録する権限がありません" },
-        { status: 403 }
-      );
-    }
-    return NextResponse.json<ApiError>(
-      { error: "支出登録に失敗しました" },
-      { status: 500 }
-    );
+  },
+  {
+    defaultErrorMessage: "支出登録に失敗しました",
+    forbiddenMessage: "このグループに支出を登録する権限がありません",
   }
-}
+);

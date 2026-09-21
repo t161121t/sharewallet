@@ -2,13 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import type { ApiError } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { requireAuthUserId } from "@/lib/auth";
+import { withApiErrorHandling } from "@/lib/apiError";
 import { GroupRole } from "@/generated/prisma/client";
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ token: string }> }
-) {
-  try {
+export const POST = withApiErrorHandling<{ params: Promise<{ token: string }> }>(
+  async (req: NextRequest, { params }) => {
     const userId = await requireAuthUserId(req);
     const { token } = await params;
 
@@ -45,13 +43,6 @@ export async function POST(
       groupId: invitation.groupId,
       groupName: invitation.group.name,
     });
-  } catch (e) {
-    if (e instanceof Error && e.message === "UNAUTHORIZED") {
-      return NextResponse.json<ApiError>({ error: "認証が必要です" }, { status: 401 });
-    }
-    return NextResponse.json<ApiError>(
-      { error: "グループへの参加に失敗しました" },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { defaultErrorMessage: "グループへの参加に失敗しました" }
+);

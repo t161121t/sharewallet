@@ -20,11 +20,16 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
-vi.mock("@/lib/auth", () => ({
-  requireAuthUserId: mockRequireAuthUserId,
-  assertGroupMember: mockAssertGroupMember,
-}));
+vi.mock("@/lib/auth", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/auth")>("@/lib/auth");
+  return {
+    ...actual,
+    requireAuthUserId: mockRequireAuthUserId,
+    assertGroupMember: mockAssertGroupMember,
+  };
+});
 
+import { UnauthorizedError, ForbiddenError } from "@/lib/auth";
 import { GET, POST } from "./route";
 
 const GROUP_ID = "group-1";
@@ -45,7 +50,7 @@ describe("GET /api/groups/[groupId]/expenses", () => {
   });
 
   it("未認証は 401 を返す", async () => {
-    mockRequireAuthUserId.mockRejectedValue(new Error("UNAUTHORIZED"));
+    mockRequireAuthUserId.mockRejectedValue(new UnauthorizedError());
 
     const res = await GET(createJsonRequest(BASE_URL), params);
 
@@ -55,7 +60,7 @@ describe("GET /api/groups/[groupId]/expenses", () => {
 
   it("非メンバーは 403 を返す", async () => {
     mockRequireAuthUserId.mockResolvedValue("outsider");
-    mockAssertGroupMember.mockRejectedValue(new Error("FORBIDDEN"));
+    mockAssertGroupMember.mockRejectedValue(new ForbiddenError());
 
     const res = await GET(createJsonRequest(BASE_URL), params);
 
@@ -73,7 +78,7 @@ describe("POST /api/groups/[groupId]/expenses", () => {
   });
 
   it("未認証は 401 を返す", async () => {
-    mockRequireAuthUserId.mockRejectedValue(new Error("UNAUTHORIZED"));
+    mockRequireAuthUserId.mockRejectedValue(new UnauthorizedError());
 
     const res = await POST(
       createJsonRequest(BASE_URL, {
@@ -88,7 +93,7 @@ describe("POST /api/groups/[groupId]/expenses", () => {
   });
 
   it("非メンバーは 403 を返す", async () => {
-    mockAssertGroupMember.mockRejectedValue(new Error("FORBIDDEN"));
+    mockAssertGroupMember.mockRejectedValue(new ForbiddenError());
 
     const res = await POST(
       createJsonRequest(BASE_URL, {

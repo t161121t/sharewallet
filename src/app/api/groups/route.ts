@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Group, ApiError } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { requireAuthUserId } from "@/lib/auth";
+import { withApiErrorHandling } from "@/lib/apiError";
 import { GroupRole } from "@/generated/prisma/client";
 
 function isUnknownIconUrlError(e: unknown) {
@@ -13,9 +14,8 @@ function isUnknownIconUrlError(e: unknown) {
 }
 
 /** GET /api/groups - グループ一覧取得 */
-export async function GET(req: NextRequest) {
-  try {
-    const userId = await requireAuthUserId(req);
+export const GET = withApiErrorHandling(async (req: NextRequest) => {
+  const userId = await requireAuthUserId(req);
     const groups = await prisma.group.findMany({
       where: {
         members: { some: { userId } },
@@ -44,22 +44,9 @@ export async function GET(req: NextRequest) {
     }));
 
     return NextResponse.json<Group[]>(result);
-  } catch (e) {
-    if (e instanceof Error && e.message === "UNAUTHORIZED") {
-      return NextResponse.json<ApiError>(
-        { error: "認証が必要です" },
-        { status: 401 }
-      );
-    }
-    return NextResponse.json<ApiError>(
-      { error: "グループ一覧の取得に失敗しました" },
-      { status: 500 }
-    );
-  }
-}
+}, { defaultErrorMessage: "グループ一覧の取得に失敗しました" });
 
-export async function POST(req: NextRequest) {
-  try {
+export const POST = withApiErrorHandling(async (req: NextRequest) => {
     const userId = await requireAuthUserId(req);
     const body = await req.json().catch(() => null);
     if (!body?.name || typeof body.name !== "string") {
@@ -128,16 +115,4 @@ export async function POST(req: NextRequest) {
       })),
     };
     return NextResponse.json<Group>(result, { status: 201 });
-  } catch (e) {
-    if (e instanceof Error && e.message === "UNAUTHORIZED") {
-      return NextResponse.json<ApiError>(
-        { error: "認証が必要です" },
-        { status: 401 }
-      );
-    }
-    return NextResponse.json<ApiError>(
-      { error: "グループ作成に失敗しました" },
-      { status: 500 }
-    );
-  }
-}
+}, { defaultErrorMessage: "グループ作成に失敗しました" });

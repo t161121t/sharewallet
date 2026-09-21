@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import type { ApiError, ExpenseRecord } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { assertGroupMember, assertGroupRole, requireAuthUserId } from "@/lib/auth";
+import { withApiErrorHandling } from "@/lib/apiError";
 import { GroupRole } from "@/generated/prisma/client";
 
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: Promise<{ groupId: string; expenseId: string }> }
-) {
-  try {
+type RouteContext = { params: Promise<{ groupId: string; expenseId: string }> };
+
+export const PUT = withApiErrorHandling<RouteContext>(
+  async (req: NextRequest, { params }) => {
     const userId = await requireAuthUserId(req);
     const { groupId, expenseId } = await params;
     await assertGroupMember(groupId, userId);
@@ -75,28 +75,15 @@ export async function PUT(
       })),
     };
     return NextResponse.json<ExpenseRecord>(result);
-  } catch (e) {
-    if (e instanceof Error && e.message === "UNAUTHORIZED") {
-      return NextResponse.json<ApiError>({ error: "認証が必要です" }, { status: 401 });
-    }
-    if (e instanceof Error && e.message === "FORBIDDEN") {
-      return NextResponse.json<ApiError>(
-        { error: "支出を編集する権限がありません" },
-        { status: 403 }
-      );
-    }
-    return NextResponse.json<ApiError>(
-      { error: "支出編集に失敗しました" },
-      { status: 500 }
-    );
+  },
+  {
+    defaultErrorMessage: "支出編集に失敗しました",
+    forbiddenMessage: "支出を編集する権限がありません",
   }
-}
+);
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: Promise<{ groupId: string; expenseId: string }> }
-) {
-  try {
+export const DELETE = withApiErrorHandling<RouteContext>(
+  async (req: NextRequest, { params }) => {
     const userId = await requireAuthUserId(req);
     const { groupId, expenseId } = await params;
     await assertGroupMember(groupId, userId);
@@ -113,19 +100,9 @@ export async function DELETE(
     }
     await prisma.expense.delete({ where: { id: expenseId } });
     return NextResponse.json({ ok: true });
-  } catch (e) {
-    if (e instanceof Error && e.message === "UNAUTHORIZED") {
-      return NextResponse.json<ApiError>({ error: "認証が必要です" }, { status: 401 });
-    }
-    if (e instanceof Error && e.message === "FORBIDDEN") {
-      return NextResponse.json<ApiError>(
-        { error: "支出を削除する権限がありません" },
-        { status: 403 }
-      );
-    }
-    return NextResponse.json<ApiError>(
-      { error: "支出削除に失敗しました" },
-      { status: 500 }
-    );
+  },
+  {
+    defaultErrorMessage: "支出削除に失敗しました",
+    forbiddenMessage: "支出を削除する権限がありません",
   }
-}
+);

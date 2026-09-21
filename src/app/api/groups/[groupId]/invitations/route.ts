@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
-import type { ApiError } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { assertGroupRole, requireAuthUserId } from "@/lib/auth";
+import { withApiErrorHandling } from "@/lib/apiError";
 import { GroupRole } from "@/generated/prisma/client";
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ groupId: string }> }
-) {
-  try {
+type RouteContext = { params: Promise<{ groupId: string }> };
+
+export const POST = withApiErrorHandling<RouteContext>(
+  async (req: NextRequest, { params }) => {
     const actorId = await requireAuthUserId(req);
     const { groupId } = await params;
     await assertGroupRole(groupId, actorId, [GroupRole.OWNER, GroupRole.ADMIN]);
@@ -39,28 +38,15 @@ export async function POST(
       },
       { status: 201 }
     );
-  } catch (e) {
-    if (e instanceof Error && e.message === "UNAUTHORIZED") {
-      return NextResponse.json<ApiError>({ error: "認証が必要です" }, { status: 401 });
-    }
-    if (e instanceof Error && e.message === "FORBIDDEN") {
-      return NextResponse.json<ApiError>(
-        { error: "招待リンクを作成する権限がありません" },
-        { status: 403 }
-      );
-    }
-    return NextResponse.json<ApiError>(
-      { error: "招待リンクの作成に失敗しました" },
-      { status: 500 }
-    );
+  },
+  {
+    defaultErrorMessage: "招待リンクの作成に失敗しました",
+    forbiddenMessage: "招待リンクを作成する権限がありません",
   }
-}
+);
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ groupId: string }> }
-) {
-  try {
+export const GET = withApiErrorHandling<RouteContext>(
+  async (req: NextRequest, { params }) => {
     const actorId = await requireAuthUserId(req);
     const { groupId } = await params;
     await assertGroupRole(groupId, actorId, [GroupRole.OWNER, GroupRole.ADMIN]);
@@ -81,19 +67,9 @@ export async function GET(
         status: inv.status,
       }))
     );
-  } catch (e) {
-    if (e instanceof Error && e.message === "UNAUTHORIZED") {
-      return NextResponse.json<ApiError>({ error: "認証が必要です" }, { status: 401 });
-    }
-    if (e instanceof Error && e.message === "FORBIDDEN") {
-      return NextResponse.json<ApiError>(
-        { error: "招待リンクを取得する権限がありません" },
-        { status: 403 }
-      );
-    }
-    return NextResponse.json<ApiError>(
-      { error: "招待リンクの取得に失敗しました" },
-      { status: 500 }
-    );
+  },
+  {
+    defaultErrorMessage: "招待リンクの取得に失敗しました",
+    forbiddenMessage: "招待リンクを取得する権限がありません",
   }
-}
+);

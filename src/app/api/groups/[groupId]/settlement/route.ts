@@ -2,14 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import type { ApiError, SettlementResult, GroupMember, ExpenseRecord } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { assertGroupMember, requireAuthUserId } from "@/lib/auth";
+import { withApiErrorHandling } from "@/lib/apiError";
 import { calculateSettlement } from "@/lib/settlement";
 
 /** GET /api/groups/[groupId]/settlement - 精算計算結果取得 */
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ groupId: string }> }
-) {
-  try {
+export const GET = withApiErrorHandling<{ params: Promise<{ groupId: string }> }>(
+  async (req: NextRequest, { params }) => {
     const userId = await requireAuthUserId(req);
     const { groupId } = await params;
     await assertGroupMember(groupId, userId);
@@ -55,19 +53,9 @@ export async function GET(
     const result = calculateSettlement(members, expenseRecords);
 
     return NextResponse.json<SettlementResult>(result);
-  } catch (e) {
-    if (e instanceof Error && e.message === "UNAUTHORIZED") {
-      return NextResponse.json<ApiError>({ error: "認証が必要です" }, { status: 401 });
-    }
-    if (e instanceof Error && e.message === "FORBIDDEN") {
-      return NextResponse.json<ApiError>(
-        { error: "このグループの精算情報を閲覧する権限がありません" },
-        { status: 403 }
-      );
-    }
-    return NextResponse.json<ApiError>(
-      { error: "精算計算に失敗しました" },
-      { status: 500 }
-    );
+  },
+  {
+    defaultErrorMessage: "精算計算に失敗しました",
+    forbiddenMessage: "このグループの精算情報を閲覧する権限がありません",
   }
-}
+);

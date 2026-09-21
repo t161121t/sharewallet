@@ -1,8 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import type { Group, ApiError } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { requireAuthUserId, assertGroupMember, assertGroupRole } from "@/lib/auth";
+import { withApiErrorHandling } from "@/lib/apiError";
 import { GroupRole } from "@/generated/prisma/client";
+
+type RouteContext = { params: Promise<{ groupId: string }> };
 
 function isUnknownIconUrlError(e: unknown) {
   return (
@@ -13,11 +16,8 @@ function isUnknownIconUrlError(e: unknown) {
 }
 
 /** GET /api/groups/[groupId] - グループ詳細取得 */
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ groupId: string }> }
-) {
-  try {
+export const GET = withApiErrorHandling<RouteContext>(
+  async (req, { params }) => {
     const userId = await requireAuthUserId(req);
     const { groupId } = await params;
     await assertGroupMember(groupId, userId);
@@ -54,31 +54,15 @@ export async function GET(
       })),
     };
     return NextResponse.json<Group>(result);
-  } catch (e) {
-    if (e instanceof Error && e.message === "UNAUTHORIZED") {
-      return NextResponse.json<ApiError>(
-        { error: "認証が必要です" },
-        { status: 401 }
-      );
-    }
-    if (e instanceof Error && e.message === "FORBIDDEN") {
-      return NextResponse.json<ApiError>(
-        { error: "このグループにアクセスする権限がありません" },
-        { status: 403 }
-      );
-    }
-    return NextResponse.json<ApiError>(
-      { error: "グループ取得に失敗しました" },
-      { status: 500 }
-    );
+  },
+  {
+    defaultErrorMessage: "グループ取得に失敗しました",
+    forbiddenMessage: "このグループにアクセスする権限がありません",
   }
-}
+);
 
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: Promise<{ groupId: string }> }
-) {
-  try {
+export const PUT = withApiErrorHandling<RouteContext>(
+  async (req, { params }) => {
     const userId = await requireAuthUserId(req);
     const { groupId } = await params;
     await assertGroupRole(groupId, userId, [GroupRole.OWNER, GroupRole.ADMIN]);
@@ -146,46 +130,23 @@ export async function PUT(
       })),
     };
     return NextResponse.json<Group>(result);
-  } catch (e) {
-    if (e instanceof Error && e.message === "UNAUTHORIZED") {
-      return NextResponse.json<ApiError>({ error: "認証が必要です" }, { status: 401 });
-    }
-    if (e instanceof Error && e.message === "FORBIDDEN") {
-      return NextResponse.json<ApiError>(
-        { error: "グループを編集する権限がありません" },
-        { status: 403 }
-      );
-    }
-    return NextResponse.json<ApiError>(
-      { error: "グループ編集に失敗しました" },
-      { status: 500 }
-    );
+  },
+  {
+    defaultErrorMessage: "グループ編集に失敗しました",
+    forbiddenMessage: "グループを編集する権限がありません",
   }
-}
+);
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: Promise<{ groupId: string }> }
-) {
-  try {
+export const DELETE = withApiErrorHandling<RouteContext>(
+  async (req, { params }) => {
     const userId = await requireAuthUserId(req);
     const { groupId } = await params;
     await assertGroupRole(groupId, userId, [GroupRole.OWNER]);
     await prisma.group.delete({ where: { id: groupId } });
     return NextResponse.json({ ok: true });
-  } catch (e) {
-    if (e instanceof Error && e.message === "UNAUTHORIZED") {
-      return NextResponse.json<ApiError>({ error: "認証が必要です" }, { status: 401 });
-    }
-    if (e instanceof Error && e.message === "FORBIDDEN") {
-      return NextResponse.json<ApiError>(
-        { error: "グループを削除する権限がありません" },
-        { status: 403 }
-      );
-    }
-    return NextResponse.json<ApiError>(
-      { error: "グループ削除に失敗しました" },
-      { status: 500 }
-    );
+  },
+  {
+    defaultErrorMessage: "グループ削除に失敗しました",
+    forbiddenMessage: "グループを削除する権限がありません",
   }
-}
+);
