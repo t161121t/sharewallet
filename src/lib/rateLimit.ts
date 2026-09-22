@@ -1,10 +1,20 @@
 import { randomUUID } from "crypto";
+import { NextResponse } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
+import type { ApiError } from "@/types";
 
 export type RateLimitResult =
   | { allowed: true }
   | { allowed: false; retryAfterSeconds: number };
+
+/** レート制限超過時の429レスポンス(login/register/password-changeで共通利用) */
+export function tooManyRequestsResponse(retryAfterSeconds: number) {
+  return NextResponse.json<ApiError>(
+    { error: "試行回数が多すぎます。しばらく待ってから再度お試しください" },
+    { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
+  );
+}
 
 type RateLimitOptions = {
   /** カウントをリセットするまでの時間(ミリ秒) */

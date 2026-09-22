@@ -18,10 +18,14 @@ vi.mock("bcryptjs", () => ({
   default: { hash: mockHash },
 }));
 
-vi.mock("@/lib/rateLimit", () => ({
-  consumeRateLimit: mockConsumeRateLimit,
-  getClientIp: () => "127.0.0.1",
-}));
+vi.mock("@/lib/rateLimit", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/rateLimit")>("@/lib/rateLimit");
+  return {
+    ...actual,
+    consumeRateLimit: mockConsumeRateLimit,
+    getClientIp: () => "127.0.0.1",
+  };
+});
 
 import { POST } from "./route";
 

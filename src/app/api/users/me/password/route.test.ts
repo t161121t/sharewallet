@@ -31,9 +31,13 @@ vi.mock("bcryptjs", () => ({
   default: { compare: mockCompare, hash: mockHash },
 }));
 
-vi.mock("@/lib/rateLimit", () => ({
-  consumeRateLimit: mockConsumeRateLimit,
-}));
+vi.mock("@/lib/rateLimit", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/rateLimit")>("@/lib/rateLimit");
+  return {
+    ...actual,
+    consumeRateLimit: mockConsumeRateLimit,
+  };
+});
 
 import { PUT } from "./route";
 

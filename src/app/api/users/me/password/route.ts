@@ -3,20 +3,13 @@ import bcrypt from "bcryptjs";
 import type { ApiError } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { requireAuthUserId } from "@/lib/auth";
-import { consumeRateLimit } from "@/lib/rateLimit";
-import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
+import { consumeRateLimit, tooManyRequestsResponse } from "@/lib/rateLimit";
+import { MIN_PASSWORD_LENGTH, normalizePassword } from "@/lib/validation";
 
 // 本人(userId)単位: 認証Cookieを窃取した攻撃者が現在のパスワードを
 // 総当たりするのを防ぐ。IPではなくuserIdで区切るのは、Cookieさえ
 // あればどのIPからでも試行できてしまうため。
 const CURRENT_PASSWORD_LIMIT = { windowMs: 15 * 60 * 1000, max: 5 };
-
-function tooManyRequests(retryAfterSeconds: number) {
-  return NextResponse.json<ApiError>(
-    { error: "試行回数が多すぎます。しばらく待ってから再度お試しください" },
-    { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
-  );
-}
 
 /** PUT /api/users/me/password - パスワード変更(現在のパスワードの照合が必要) */
 export async function PUT(req: NextRequest) {
@@ -37,11 +30,12 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    // 検証と保存を同じ値(trim後)で行う。ここでtrimした結果ではなく
-    // body.newPasswordをそのままhashすると、末尾の空白などが検証を
-    // すり抜けたままハッシュ化されてしまい、ログイン時に入力した値と
-    // 一致しなくなる(意図せず自分をロックアウトする)。
-    const newPassword = body.newPassword.trim();
+    // 検証・照合・保存を全て同じ正規化後の値で行う。currentPasswordだけ
+    // 正規化を怠ると、newPassword側だけtrimしていることとの非対称になり、
+    // 「trim後の値でハッシュ化された過去のパスワードを、末尾に空白付きで
+    // 再入力すると照合に失敗する」といった不整合が起きる。
+    const currentPassword = normalizePassword(body.currentPassword);
+    const newPassword = normalizePassword(body.newPassword);
     if (newPassword.length < MIN_PASSWORD_LENGTH) {
       return NextResponse.json<ApiError>(
         { error: `新しいパスワードは${MIN_PASSWORD_LENGTH}文字以上で入力してください` },
@@ -53,7 +47,7 @@ export async function PUT(req: NextRequest) {
       `password-change:user:${userId}`,
       CURRENT_PASSWORD_LIMIT
     );
-    if (!rateCheck.allowed) return tooManyRequests(rateCheck.retryAfterSeconds);
+    if (!rateCheck.allowed) return tooManyRequestsResponse(rateCheck.retryAfterSeconds);
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -68,7 +62,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const isCurrentPasswordValid = await bcrypt.compare(
-      body.currentPassword,
+      currentPassword,
       user.passwordHash
     );
     if (!isCurrentPasswordValid) {
