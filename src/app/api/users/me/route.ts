@@ -65,7 +65,10 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    if (body.email !== undefined && !EMAIL_PATTERN.test(body.email)) {
+    if (
+      body.email !== undefined &&
+      (typeof body.email !== "string" || !EMAIL_PATTERN.test(body.email))
+    ) {
       return NextResponse.json<ApiError>(
         { error: "メールアドレスの形式が正しくありません" },
         { status: 400 }
@@ -82,7 +85,10 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    if (body.color !== undefined && !COLOR_PATTERN.test(body.color)) {
+    if (
+      body.color !== undefined &&
+      (typeof body.color !== "string" || !COLOR_PATTERN.test(body.color))
+    ) {
       return NextResponse.json<ApiError>(
         { error: "カラーコードの形式が正しくありません" },
         { status: 400 }

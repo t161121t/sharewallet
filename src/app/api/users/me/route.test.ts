@@ -89,6 +89,30 @@ describe("PUT /api/users/me", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
+  it("emailが配列(型強制で正規表現をすり抜ける値)なら 400 を返す", async () => {
+    const res = await PUT(
+      createJsonRequest(URL, { method: "PUT", body: { email: ["x@y.com"] } })
+    );
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: "メールアドレスの形式が正しくありません",
+    });
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("colorが配列(型強制で正規表現をすり抜ける値)なら 400 を返す", async () => {
+    const res = await PUT(
+      createJsonRequest(URL, { method: "PUT", body: { color: ["#c9a227"] } })
+    );
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: "カラーコードの形式が正しくありません",
+    });
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
   it("名前が空文字なら 400 を返す", async () => {
     const res = await PUT(
       createJsonRequest(URL, { method: "PUT", body: { name: "  " } })
