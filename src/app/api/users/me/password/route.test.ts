@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createJsonRequest } from "@/test/helpers";
 
-const { mockFindUnique, mockUpdate, mockGetAuthUserId, mockCompare, mockHash } =
+const { mockFindUnique, mockUpdate, mockRequireAuthUserId, mockCompare, mockHash } =
   vi.hoisted(() => ({
     mockFindUnique: vi.fn(),
     mockUpdate: vi.fn(),
-    mockGetAuthUserId: vi.fn(),
+    mockRequireAuthUserId: vi.fn(),
     mockCompare: vi.fn(),
     mockHash: vi.fn(),
   }));
@@ -17,7 +17,7 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 vi.mock("@/lib/auth", () => ({
-  getAuthUserId: mockGetAuthUserId,
+  requireAuthUserId: mockRequireAuthUserId,
 }));
 
 vi.mock("bcryptjs", () => ({
@@ -32,10 +32,11 @@ const URL = "http://localhost/api/users/me/password";
 describe("PUT /api/users/me/password", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRequireAuthUserId.mockResolvedValue(USER_ID);
   });
 
   it("未認証は401を返す", async () => {
-    mockGetAuthUserId.mockResolvedValue(null);
+    mockRequireAuthUserId.mockRejectedValue(new Error("UNAUTHORIZED"));
 
     const res = await PUT(
       createJsonRequest(URL, {
@@ -45,19 +46,31 @@ describe("PUT /api/users/me/password", () => {
     );
 
     expect(res.status).toBe(401);
+    await expect(res.json()).resolves.toEqual({ error: "認証が必要です" });
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("currentPassword/newPasswordが無いと400を返す", async () => {
-    mockGetAuthUserId.mockResolvedValue(USER_ID);
-
     const res = await PUT(createJsonRequest(URL, { method: "PUT", body: {} }));
 
     expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("currentPasswordが文字列以外(配列)なら400を返す", async () => {
+    const res = await PUT(
+      createJsonRequest(URL, {
+        method: "PUT",
+        body: { currentPassword: ["old-pass"], newPassword: "new-pass-123" },
+      })
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockCompare).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("新しいパスワードが8文字未満だと400を返す", async () => {
-    mockGetAuthUserId.mockResolvedValue(USER_ID);
-
     const res = await PUT(
       createJsonRequest(URL, {
         method: "PUT",
@@ -66,10 +79,10 @@ describe("PUT /api/users/me/password", () => {
     );
 
     expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("ユーザーが存在しない場合404を返す", async () => {
-    mockGetAuthUserId.mockResolvedValue(USER_ID);
     mockFindUnique.mockResolvedValue(null);
 
     const res = await PUT(
@@ -83,7 +96,6 @@ describe("PUT /api/users/me/password", () => {
   });
 
   it("現在のパスワードが誤っている場合401を返し更新しない", async () => {
-    mockGetAuthUserId.mockResolvedValue(USER_ID);
     mockFindUnique.mockResolvedValue({ id: USER_ID, passwordHash: "stored-hash" });
     mockCompare.mockResolvedValue(false);
 
@@ -98,8 +110,23 @@ describe("PUT /api/users/me/password", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
+  it("想定外のDBエラーはスタックトレースを漏らさず500のApiError形式で返す", async () => {
+    mockFindUnique.mockRejectedValue(new Error("db down"));
+
+    const res = await PUT(
+      createJsonRequest(URL, {
+        method: "PUT",
+        body: { currentPassword: "old-pass", newPassword: "new-pass-123" },
+      })
+    );
+
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toEqual({
+      error: "パスワードの変更に失敗しました",
+    });
+  });
+
   it("正しい入力ならパスワードを更新して200を返す", async () => {
-    mockGetAuthUserId.mockResolvedValue(USER_ID);
     mockFindUnique.mockResolvedValue({ id: USER_ID, passwordHash: "stored-hash" });
     mockCompare.mockResolvedValue(true);
     mockHash.mockResolvedValue("new-hash");
