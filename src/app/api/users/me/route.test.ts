@@ -89,6 +89,38 @@ describe("PUT /api/users/me", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
+  it("名前が空文字なら 400 を返す", async () => {
+    const res = await PUT(
+      createJsonRequest(URL, { method: "PUT", body: { name: "  " } })
+    );
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "名前が不正です" });
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("カラーコードの形式が不正なら 400 を返す", async () => {
+    const res = await PUT(
+      createJsonRequest(URL, { method: "PUT", body: { color: "not-a-color" } })
+    );
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: "カラーコードの形式が正しくありません",
+    });
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("avatarUrlが文字列でもnullでもなければ 400 を返す", async () => {
+    const res = await PUT(
+      createJsonRequest(URL, { method: "PUT", body: { avatarUrl: 123 } })
+    );
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "アバター画像が不正です" });
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
   it("重複するメールアドレスに更新しようとすると 409 を返す(P2002を握りつぶさない)", async () => {
     mockUpdate.mockRejectedValue(
       Object.assign(new Error("Unique constraint failed"), { code: "P2002" })

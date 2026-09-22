@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuthUserId } from "@/lib/auth";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
 
 function isUniqueConstraintError(e: unknown): boolean {
   return (
@@ -71,10 +72,38 @@ export async function PUT(req: NextRequest) {
       );
     }
 
+    if (
+      body.name !== undefined &&
+      (typeof body.name !== "string" || body.name.trim().length === 0)
+    ) {
+      return NextResponse.json<ApiError>(
+        { error: "名前が不正です" },
+        { status: 400 }
+      );
+    }
+
+    if (body.color !== undefined && !COLOR_PATTERN.test(body.color)) {
+      return NextResponse.json<ApiError>(
+        { error: "カラーコードの形式が正しくありません" },
+        { status: 400 }
+      );
+    }
+
+    if (
+      body.avatarUrl !== undefined &&
+      body.avatarUrl !== null &&
+      typeof body.avatarUrl !== "string"
+    ) {
+      return NextResponse.json<ApiError>(
+        { error: "アバター画像が不正です" },
+        { status: 400 }
+      );
+    }
+
     const updated = await prisma.user.update({
       where: { id: userId },
       data: {
-        ...(body.name !== undefined && { name: body.name }),
+        ...(body.name !== undefined && { name: body.name.trim() }),
         ...(body.email !== undefined && { email: body.email }),
         ...(body.color !== undefined && { color: body.color }),
         ...(body.avatarUrl !== undefined && { avatarUrl: body.avatarUrl }),

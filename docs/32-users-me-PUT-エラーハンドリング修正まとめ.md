@@ -11,10 +11,10 @@
 - `GET`/`PUT /api/users/me` を、他のAPIルート(`groups`, `expenses`など)と同じ「`requireAuthUserId` + try/catch + `ApiError`形式」のパターンに揃えた
 - `email`更新時に簡易な形式バリデーションを追加した
 - メールアドレス重複時のPrismaユニーク制約違反(`P2002`)を捕捉し、生の500エラーではなく409の`ApiError`を返すようにした
-- ルートハンドラを直接呼び出すユニットテストを新規追加(6件)
+- ルートハンドラを直接呼び出すユニットテストを新規追加(9件)
 
 ```bash
-npx vitest run   # 44件パス(新規6件を含む)
+npx vitest run   # 51件パス(新規9件を含む)
 ```
 
 ---
@@ -24,6 +24,19 @@ npx vitest run   # 44件パス(新規6件を含む)
 `src/app/api/users/me/route.ts` はこのリポジトリで唯一、try/catchで囲まれていないAPIルートでした。特に`PUT`ハンドラは`body.email`をそのまま更新に使っており、形式チェック・重複チェックがありませんでした。既存ユーザーと重複するメールアドレスに変更しようとすると、Prismaのユニーク制約違反(`P2002`)がそのまま未処理例外として投げられ、Next.jsのデフォルトエラーハンドリング(生の500・スタックトレース混じりのレスポンス)に落ちていました。
 
 他の全ルート(`groups`, `expenses`など)は`try/catch`で`ApiError`形式のJSONを返しているのに対し、このルートだけ挙動が異なり、クライアント側で想定外のレスポンス形式を受け取る可能性がありました。
+
+---
+
+## 選択肢の比較
+
+このルートには本質的に2つの直し方がありました。
+
+| 案 | 内容 | メリット | デメリット |
+| --- | --- | --- | --- |
+| **A. `requireAuthUserId`+try/catchに統一(採用)** | `getAuthUserId`(nullチェック方式)をやめ、`groups`/`expenses`と同じ「投げる方式+try/catch」に揃える | GET/PUTとも他ルートと完全に同じ構造になり、以後ハンドラが増えても迷わず同じパターンを踏襲できる | `GET`側も一緒に書き換える必要があり、issue本文が明示していた範囲(PUTのみ)より変更が少し広がる |
+| B. `getAuthUserId`は維持し、PUTの中身だけtry/catchで囲む | 認証部分は変更せず、PUTのエラーハンドリングだけ追加する | 変更差分が最小になる | GET/PUTで認証エラーの伝え方(null返却 vs 例外)が混在したままになり、「他ルートとの表記ゆれ」という根本原因が残る |
+
+**Aを採用した理由**: issue本文が「他の全ルートと同様にtry/catchで包む」ことを明示的に求めており、`getAuthUserId`のnullチェック方式は結局「他ルートとの表記ゆれ」の根本原因でもあったため、GET/PUTとも根本から揃えることにしました。
 
 ---
 
@@ -86,7 +99,18 @@ export async function PUT(req: NextRequest) {
 
 ### テスト — `src/app/api/users/me/route.test.ts`(新規)
 
-`src/app/api/groups/[groupId]/expenses/route.test.ts`と同じ「ルートハンドラを直接呼び出し、`@/lib/prisma`と`@/lib/auth`をモックする」方式で6件追加しました。P2002エラーは`Object.assign(new Error(...), { code: "P2002" })`で模擬しています。
+`src/app/api/groups/[groupId]/expenses/route.test.ts`と同じ「ルートハンドラを直接呼び出し、`@/lib/prisma`と`@/lib/auth`をモックする」方式で追加しました。P2002エラーは`Object.assign(new Error(...), { code: "P2002" })`で模擬しています。
+
+---
+
+## レビューで指摘された点と対応
+
+`/code-review 48`によるレビューで2点の指摘を受けました。
+
+| 指摘 | 何が問題だったか | 対応 |
+| --- | --- | --- |
+| **`name`/`color`/`avatarUrl`が未検証(最重要)** | `email`だけ形式チェックを追加していたが、`name`/`color`/`avatarUrl`はノーチェックで`prisma.user.update`に渡していた。参照元にした`groups/[groupId]/route.ts`のPUTは`name`のtrim+空文字チェック、`color`のhex正規表現チェックを行っているのに、統一したはずの`users/me`側だけ抜け落ちていた。空文字の`name`で表示名を消せてしまう、非hex文字列の`color`がそのまま保存されUIが壊れる、`color`に数値など非文字列を渡すと`PrismaClientValidationError`が汎用catchに落ちて意味のない500になる、といった問題があった | `name`(trim後空文字なら400)・`color`(`/^#[0-9A-Fa-f]{6}$/`にマッチしなければ400)・`avatarUrl`(stringでもnullでもなければ400)のバリデーションを追加。あわせて保存前の`name`もtrimするよう修正 |
+| **docsに「選択肢の比較」セクションがない** | PR本文では2つの実装方針(`requireAuthUserId`統一 vs `getAuthUserId`維持)を検討していたが、CLAUDE.mdが要求する`## 選択肢の比較`セクションがドキュメントになかった | 本ドキュメントに追加(上記参照) |
 
 ---
 
@@ -95,7 +119,7 @@ export async function PUT(req: NextRequest) {
 | ファイル | 種別 | 内容 |
 | --- | --- | --- |
 | `src/app/api/users/me/route.ts` | 変更 | try/catch統一、emailバリデーション、P2002ハンドリング |
-| `src/app/api/users/me/route.test.ts` | 新規 | ユニットテスト6件 |
+| `src/app/api/users/me/route.test.ts` | 新規 | ユニットテスト9件 |
 | `docs/32-users-me-PUT-エラーハンドリング修正まとめ.md` | 新規 | 本ドキュメント |
 
 ---
@@ -104,7 +128,7 @@ export async function PUT(req: NextRequest) {
 
 ```
 npx tsc --noEmit   # 型エラーなし
-npx vitest run     # Test Files 5 passed / Tests 44 passed
+npx vitest run     # Test Files 6 passed / Tests 51 passed
 npx eslint <変更ファイル>  # 警告・エラーなし
 ```
 
