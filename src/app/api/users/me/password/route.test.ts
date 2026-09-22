@@ -153,6 +153,26 @@ describe("PUT /api/users/me/password", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
+  it("新しいパスワードの末尾に空白があっても、検証と保存で同じ(trim後の)値を使う", async () => {
+    mockFindUnique.mockResolvedValue({ id: USER_ID, passwordHash: "stored-hash" });
+    mockCompare.mockResolvedValue(true);
+    mockHash.mockResolvedValue("new-hash");
+    mockUpdate.mockResolvedValue({});
+
+    const res = await PUT(
+      createJsonRequest(URL, {
+        method: "PUT",
+        body: { currentPassword: "old-pass", newPassword: "new-pass-123 " },
+      })
+    );
+
+    expect(res.status).toBe(200);
+    // trim前の"new-pass-123 "ではなく、trim後の"new-pass-123"がhashされること
+    // (末尾の空白を含んだままハッシュ化すると、次回ログイン時に入力した値と
+    // 一致せず自分をロックアウトしてしまう)
+    expect(mockHash).toHaveBeenCalledWith("new-pass-123", 10);
+  });
+
   it("想定外のDBエラーはスタックトレースを漏らさず500のApiError形式で返す", async () => {
     mockFindUnique.mockRejectedValue(new Error("db down"));
 

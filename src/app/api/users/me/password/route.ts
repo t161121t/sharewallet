@@ -37,7 +37,12 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    if (body.newPassword.trim().length < MIN_PASSWORD_LENGTH) {
+    // 検証と保存を同じ値(trim後)で行う。ここでtrimした結果ではなく
+    // body.newPasswordをそのままhashすると、末尾の空白などが検証を
+    // すり抜けたままハッシュ化されてしまい、ログイン時に入力した値と
+    // 一致しなくなる(意図せず自分をロックアウトする)。
+    const newPassword = body.newPassword.trim();
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
       return NextResponse.json<ApiError>(
         { error: `新しいパスワードは${MIN_PASSWORD_LENGTH}文字以上で入力してください` },
         { status: 400 }
@@ -73,7 +78,7 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const passwordHash = await bcrypt.hash(body.newPassword, 10);
+    const passwordHash = await bcrypt.hash(newPassword, 10);
     await prisma.user.update({
       where: { id: userId },
       data: { passwordHash },

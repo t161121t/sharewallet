@@ -172,7 +172,13 @@ export default function ProfilePage() {
       toast.error("現在のパスワードを入力してください");
       return;
     }
-    if (newPassword.trim().length < MIN_PASSWORD_LENGTH) {
+    // サーバー側もtrim後の値をハッシュ化・保存するため、検証と送信を
+    // 同じ値(trim後)で揃える。ここで揃えないと、末尾に空白が入った
+    // 状態で確認用フィールドとは一致していても、サーバー側でtrimされた
+    // 値がハッシュ化され、次回ログイン時に(空白込みで入力すると)
+    // 一致しないという混乱を招く。
+    const trimmedNewPassword = newPassword.trim();
+    if (trimmedNewPassword.length < MIN_PASSWORD_LENGTH) {
       toast.error(`新しいパスワードは${MIN_PASSWORD_LENGTH}文字以上で入力してください`);
       return;
     }
@@ -182,7 +188,7 @@ export default function ProfilePage() {
     }
     setChangingPassword(true);
     try {
-      await changePassword(currentPassword, newPassword);
+      await changePassword(currentPassword, trimmedNewPassword);
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");

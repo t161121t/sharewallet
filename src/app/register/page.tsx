@@ -11,6 +11,7 @@ import TextInput from "@/components/ui/TextInput";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import CoinIcon from "@/components/ui/CoinIcon";
 import { register, ApiClientError } from "@/lib/apiClient";
+import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
 
 function RegisterForm() {
   const router = useRouter();
@@ -30,6 +31,8 @@ function RegisterForm() {
     if (!name.trim()) newErrors.name = "名前を入力してください";
     if (!email.trim()) newErrors.email = "メールアドレスを入力してください";
     if (!password.trim()) newErrors.password = "パスワードを入力してください";
+    else if (password.trim().length < MIN_PASSWORD_LENGTH)
+      newErrors.password = `パスワードは${MIN_PASSWORD_LENGTH}文字以上で入力してください`;
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
