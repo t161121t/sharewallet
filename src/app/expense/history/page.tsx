@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
@@ -238,16 +238,18 @@ export default function HistoryPage() {
       });
   }, [router]);
 
+  // 実際のユーザーID(cuid)をキーに、DBに保存済みのメンバーカラーを引けるようにする
+  const memberColors = useMemo(() => {
+    if (!group) return {};
+    return Object.fromEntries(group.members.map((m) => [m.id, m.color]));
+  }, [group]);
+
   if (!isReady || !group) {
     return <RouteLoading text="履歴を読み込み中..." withBottomNav />;
   }
 
   const grouped = groupByDate(expenses);
   const groupId = group.id;
-  // 実際のユーザーID(cuid)をキーに、DBに保存済みのメンバーカラーを引けるようにする
-  const memberColors = Object.fromEntries(
-    group.members.map((m) => [m.id, m.color])
-  );
 
   const handleDelete = async (expenseId: string) => {
     if (!confirm("この支出を削除しますか？")) return;
