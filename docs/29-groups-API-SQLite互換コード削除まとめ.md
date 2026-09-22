@@ -1,4 +1,4 @@
-# 28. groups API SQLite互換コード削除まとめ
+# 29. groups API SQLite互換コード削除まとめ
 
 ## これは何のドキュメント？
 
@@ -60,7 +60,7 @@ issueの対象ファイルには挙げられていなかったが、`grep`した
 | --- | --- | --- |
 | `src/app/api/groups/route.ts` | 変更 | `isUnknownIconUrlError`と、それを使うフォールバック分岐を削除 |
 | `src/app/api/groups/[groupId]/route.ts` | 変更 | 同上(PUTハンドラ側) |
-| `docs/28-groups-API-SQLite互換コード削除まとめ.md` | 新規 | 本ドキュメント |
+| `docs/29-groups-API-SQLite互換コード削除まとめ.md` | 新規 | 本ドキュメント |
 
 **振る舞いの変更はありません。** 通常経路(`iconUrl`列が存在する現在のスキーマ)での動作は変更前後で同一です。
 
