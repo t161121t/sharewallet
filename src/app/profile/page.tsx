@@ -20,8 +20,7 @@ import {
   getCachedUser,
   ApiClientError,
 } from "@/lib/apiClient";
-
-const MIN_PASSWORD_LENGTH = 8;
+import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
 
 const AVATAR_COLORS = [
   "#c9a227",
@@ -173,7 +172,7 @@ export default function ProfilePage() {
       toast.error("現在のパスワードを入力してください");
       return;
     }
-    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+    if (newPassword.trim().length < MIN_PASSWORD_LENGTH) {
       toast.error(`新しいパスワードは${MIN_PASSWORD_LENGTH}文字以上で入力してください`);
       return;
     }
@@ -336,6 +335,7 @@ export default function ProfilePage() {
               placeholder="現在のパスワードを入力"
               value={currentPassword}
               onChange={setCurrentPassword}
+              disabled={changingPassword}
             />
             <TextInput
               label="新しいパスワード"
@@ -343,6 +343,7 @@ export default function ProfilePage() {
               placeholder={`${MIN_PASSWORD_LENGTH}文字以上で入力`}
               value={newPassword}
               onChange={setNewPassword}
+              disabled={changingPassword}
             />
             <TextInput
               label="新しいパスワード（確認）"
@@ -350,6 +351,7 @@ export default function ProfilePage() {
               placeholder="もう一度入力"
               value={confirmPassword}
               onChange={setConfirmPassword}
+              disabled={changingPassword}
             />
           </div>
           <div className="mt-4">

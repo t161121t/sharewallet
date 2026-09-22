@@ -3,8 +3,20 @@ import bcrypt from "bcryptjs";
 import type { ApiError } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { requireAuthUserId } from "@/lib/auth";
+import { consumeRateLimit } from "@/lib/rateLimit";
+import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
 
-const MIN_PASSWORD_LENGTH = 8;
+// 本人(userId)単位: 認証Cookieを窃取した攻撃者が現在のパスワードを
+// 総当たりするのを防ぐ。IPではなくuserIdで区切るのは、Cookieさえ
+// あればどのIPからでも試行できてしまうため。
+const CURRENT_PASSWORD_LIMIT = { windowMs: 15 * 60 * 1000, max: 5 };
+
+function tooManyRequests(retryAfterSeconds: number) {
+  return NextResponse.json<ApiError>(
+    { error: "試行回数が多すぎます。しばらく待ってから再度お試しください" },
+    { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
+  );
+}
 
 /** PUT /api/users/me/password - パスワード変更(現在のパスワードの照合が必要) */
 export async function PUT(req: NextRequest) {
@@ -25,15 +37,22 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    if (body.newPassword.length < MIN_PASSWORD_LENGTH) {
+    if (body.newPassword.trim().length < MIN_PASSWORD_LENGTH) {
       return NextResponse.json<ApiError>(
         { error: `新しいパスワードは${MIN_PASSWORD_LENGTH}文字以上で入力してください` },
         { status: 400 }
       );
     }
 
+    const rateCheck = await consumeRateLimit(
+      `password-change:user:${userId}`,
+      CURRENT_PASSWORD_LIMIT
+    );
+    if (!rateCheck.allowed) return tooManyRequests(rateCheck.retryAfterSeconds);
+
     const user = await prisma.user.findUnique({
       where: { id: userId },
+      select: { passwordHash: true },
     });
 
     if (!user) {

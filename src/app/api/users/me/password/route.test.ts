@@ -1,14 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createJsonRequest } from "@/test/helpers";
 
-const { mockFindUnique, mockUpdate, mockRequireAuthUserId, mockCompare, mockHash } =
-  vi.hoisted(() => ({
-    mockFindUnique: vi.fn(),
-    mockUpdate: vi.fn(),
-    mockRequireAuthUserId: vi.fn(),
-    mockCompare: vi.fn(),
-    mockHash: vi.fn(),
-  }));
+const {
+  mockFindUnique,
+  mockUpdate,
+  mockRequireAuthUserId,
+  mockCompare,
+  mockHash,
+  mockConsumeRateLimit,
+} = vi.hoisted(() => ({
+  mockFindUnique: vi.fn(),
+  mockUpdate: vi.fn(),
+  mockRequireAuthUserId: vi.fn(),
+  mockCompare: vi.fn(),
+  mockHash: vi.fn(),
+  mockConsumeRateLimit: vi.fn(),
+}));
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -24,6 +31,10 @@ vi.mock("bcryptjs", () => ({
   default: { compare: mockCompare, hash: mockHash },
 }));
 
+vi.mock("@/lib/rateLimit", () => ({
+  consumeRateLimit: mockConsumeRateLimit,
+}));
+
 import { PUT } from "./route";
 
 const USER_ID = "user-1";
@@ -33,6 +44,7 @@ describe("PUT /api/users/me/password", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireAuthUserId.mockResolvedValue(USER_ID);
+    mockConsumeRateLimit.mockResolvedValue({ allowed: true });
   });
 
   it("未認証は401を返す", async () => {
@@ -79,6 +91,37 @@ describe("PUT /api/users/me/password", () => {
     );
 
     expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("新しいパスワードが空白のみなら400を返す(trim後の長さで判定)", async () => {
+    const res = await PUT(
+      createJsonRequest(URL, {
+        method: "PUT",
+        body: { currentPassword: "old-pass", newPassword: "        " },
+      })
+    );
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: "新しいパスワードは8文字以上で入力してください",
+    });
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("試行回数が上限を超えたら429を返す", async () => {
+    mockConsumeRateLimit.mockResolvedValue({ allowed: false, retryAfterSeconds: 60 });
+
+    const res = await PUT(
+      createJsonRequest(URL, {
+        method: "PUT",
+        body: { currentPassword: "old-pass", newPassword: "new-pass-123" },
+      })
+    );
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("60");
+    expect(mockCompare).not.toHaveBeenCalled();
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
@@ -141,6 +184,10 @@ describe("PUT /api/users/me/password", () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ ok: true });
+    expect(mockConsumeRateLimit).toHaveBeenCalledWith(
+      `password-change:user:${USER_ID}`,
+      expect.any(Object)
+    );
     expect(mockCompare).toHaveBeenCalledWith("old-pass", "stored-hash");
     expect(mockHash).toHaveBeenCalledWith("new-pass-123", 10);
     expect(mockUpdate).toHaveBeenCalledWith({
