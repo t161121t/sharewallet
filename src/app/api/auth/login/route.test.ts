@@ -112,6 +112,27 @@ describe("POST /api/auth/login", () => {
     expect(mockSetAuthCookies).toHaveBeenCalledWith(expect.anything(), "token");
   });
 
+  it("正規化後の照合が失敗しても、生の値での照合(後方互換)が成功すればログインできる", async () => {
+    // このPRより前に登録された既存アカウントは、trimしていない生の値で
+    // ハッシュ化されている可能性がある。正規化後の比較(1回目)が失敗しても、
+    // 生の値での比較(2回目)が成功すればログインできることを確認する。
+    mockFindUnique.mockResolvedValue(USER);
+    mockCompare.mockResolvedValueOnce(false); // 1回目: normalizePassword後の値
+    mockCompare.mockResolvedValueOnce(true); // 2回目: 生の値(後方互換フォールバック)
+    mockCreateToken.mockResolvedValue("token");
+
+    const res = await POST(
+      createJsonRequest(URL, {
+        method: "POST",
+        body: { email: "taro@example.com", password: "password123 " },
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockCompare).toHaveBeenNthCalledWith(1, "password123", "stored-hash");
+    expect(mockCompare).toHaveBeenNthCalledWith(2, "password123 ", "stored-hash");
+  });
+
   it("正しい入力ならログインできる", async () => {
     mockFindUnique.mockResolvedValue(USER);
     mockCompare.mockResolvedValue(true);

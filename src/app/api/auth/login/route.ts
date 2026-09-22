@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import type { LoginResponse, ApiError } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { createToken, setAuthCookies } from "@/lib/auth";
 import { consumeRateLimit, getClientIp, tooManyRequestsResponse } from "@/lib/rateLimit";
-import { normalizePassword } from "@/lib/validation";
+import { verifyPassword } from "@/lib/password";
 
 // IP単位: 同一送信元からの総当たりを制限
 const IP_LIMIT = { windowMs: 15 * 60 * 1000, max: 20 };
@@ -37,13 +36,9 @@ export async function POST(req: NextRequest) {
     where: { email: body.email },
   });
 
-  // register/password-changeはハッシュ化前にnormalizePassword(trim)しているため、
-  // ここでも同じ正規化をしないと、末尾に空白のあるパスワードで登録/変更した
-  // 本人がログインできなくなる。
-  const password =
-    typeof body.password === "string" ? normalizePassword(body.password) : body.password;
+  const passwordMatches = user ? await verifyPassword(body.password, user.passwordHash) : false;
 
-  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+  if (!user || !passwordMatches) {
     return NextResponse.json<ApiError>(
       { error: "メールアドレスまたはパスワードが正しくありません" },
       { status: 401 }

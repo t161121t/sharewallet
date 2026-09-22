@@ -20,7 +20,7 @@ import {
   getCachedUser,
   ApiClientError,
 } from "@/lib/apiClient";
-import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
+import { MIN_PASSWORD_LENGTH, normalizePassword, isPasswordLongEnough } from "@/lib/validation";
 
 const AVATAR_COLORS = [
   "#c9a227",
@@ -172,17 +172,16 @@ export default function ProfilePage() {
       toast.error("現在のパスワードを入力してください");
       return;
     }
-    // サーバー側もtrim後の値をハッシュ化・保存するため、検証と送信を
-    // 同じ値(trim後)で揃える。ここで揃えないと、末尾に空白が入った
-    // 状態で確認用フィールドとは一致していても、サーバー側でtrimされた
-    // 値がハッシュ化され、次回ログイン時に(空白込みで入力すると)
-    // 一致しないという混乱を招く。
-    const trimmedNewPassword = newPassword.trim();
-    if (trimmedNewPassword.length < MIN_PASSWORD_LENGTH) {
+    // サーバー側もnormalizePassword(trim)後の値をハッシュ化・保存するため、
+    // 検証・一致確認・送信を全て同じ値(正規化後)で揃える。confirmPassword側の
+    // 比較を生の値のまま行うと、newPasswordだけtrimした値と食い違い、
+    // 実際には一致しているのに「一致しません」と誤判定してしまう。
+    const trimmedNewPassword = normalizePassword(newPassword);
+    if (!isPasswordLongEnough(newPassword)) {
       toast.error(`新しいパスワードは${MIN_PASSWORD_LENGTH}文字以上で入力してください`);
       return;
     }
-    if (newPassword !== confirmPassword) {
+    if (trimmedNewPassword !== normalizePassword(confirmPassword)) {
       toast.error("新しいパスワードが一致しません");
       return;
     }

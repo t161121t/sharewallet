@@ -157,6 +157,27 @@ describe("PUT /api/users/me/password", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
+  it("currentPasswordの正規化後の照合が失敗しても、生の値での照合(後方互換)が成功すれば通る", async () => {
+    // このPRより前に変更されたパスワードは、trimしていない生の値で
+    // ハッシュ化されている可能性がある。
+    mockFindUnique.mockResolvedValue({ id: USER_ID, passwordHash: "stored-hash" });
+    mockCompare.mockResolvedValueOnce(false); // 1回目: normalizePassword後の値
+    mockCompare.mockResolvedValueOnce(true); // 2回目: 生の値(後方互換フォールバック)
+    mockHash.mockResolvedValue("new-hash");
+    mockUpdate.mockResolvedValue({});
+
+    const res = await PUT(
+      createJsonRequest(URL, {
+        method: "PUT",
+        body: { currentPassword: "old-pass ", newPassword: "new-pass-123" },
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockCompare).toHaveBeenNthCalledWith(1, "old-pass", "stored-hash");
+    expect(mockCompare).toHaveBeenNthCalledWith(2, "old-pass ", "stored-hash");
+  });
+
   it("新しいパスワードの末尾に空白があっても、検証と保存で同じ(trim後の)値を使う", async () => {
     mockFindUnique.mockResolvedValue({ id: USER_ID, passwordHash: "stored-hash" });
     mockCompare.mockResolvedValue(true);
