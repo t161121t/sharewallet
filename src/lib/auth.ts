@@ -3,20 +3,36 @@ import type { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { GroupRole } from "@/generated/prisma/client";
 
-const JWT_SECRET_ENV = process.env.JWT_SECRET;
 // 開発環境でのみ使う既知のデフォルト値。本番でこれが有効になると、
 // 誰でもこの文字列でJWTを偽造しログイン状態を乗っ取れてしまうため、
 // 本番(NODE_ENV=production)では絶対に使わせない(下のチェックでfail-closed)。
 const DEV_ONLY_FALLBACK_SECRET = "dev-secret-change-in-production";
 
-if (!JWT_SECRET_ENV && process.env.NODE_ENV === "production") {
-  throw new Error(
-    "JWT_SECRET が設定されていません。本番環境では既知のデフォルト値へのフォールバックを許可していないため、" +
-      "環境変数 JWT_SECRET に十分な長さのランダムな値を設定してください。"
-  );
+let cachedSecret: Uint8Array | null = null;
+
+/**
+ * JWTの署名/検証キーを取得する。あえてモジュール読み込み時ではなく、
+ * ここ(初回のJWT生成/検証時)まで評価を遅らせている。`next build` は
+ * ページデータ収集のために各 route ハンドラ経由でこのモジュールをimportするが、
+ * 実際にトークンを扱うわけではないため、ビルド時に環境変数が参照できない
+ * 構成(例: ビルド専用コンテナに実行時シークレットが渡らない構成)でも
+ * ビルド自体は失敗させず、実際に使われる初回アクセス時にfail-closedさせる。
+ */
+function getSecret(): Uint8Array {
+  if (cachedSecret) return cachedSecret;
+
+  const envSecret = process.env.JWT_SECRET;
+  if (!envSecret && process.env.NODE_ENV === "production") {
+    throw new Error(
+      "JWT_SECRET が設定されていません。本番環境では既知のデフォルト値へのフォールバックを許可していないため、" +
+        "環境変数 JWT_SECRET に十分な長さのランダムな値を設定してください。"
+    );
+  }
+
+  cachedSecret = new TextEncoder().encode(envSecret ?? DEV_ONLY_FALLBACK_SECRET);
+  return cachedSecret;
 }
 
-const SECRET = new TextEncoder().encode(JWT_SECRET_ENV ?? DEV_ONLY_FALLBACK_SECRET);
 const ALG = "HS256";
 const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7; // 7日
 
@@ -44,13 +60,13 @@ export async function createToken(userId: string): Promise<string> {
     .setProtectedHeader({ alg: ALG })
     .setIssuedAt()
     .setExpirationTime("7d")
-    .sign(SECRET);
+    .sign(getSecret());
 }
 
 /** JWT トークン検証 → userId を返す。失敗時は null */
 export async function verifyToken(token: string): Promise<string | null> {
   try {
-    const { payload } = await jwtVerify(token, SECRET);
+    const { payload } = await jwtVerify(token, getSecret());
     return (payload.sub as string) ?? null;
   } catch {
     return null;
