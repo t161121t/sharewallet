@@ -1,4 +1,4 @@
-# 30. users/me PUT エラーハンドリング修正まとめ
+# 32. users/me PUT エラーハンドリング修正まとめ
 
 ## これは何のドキュメント？
 
@@ -96,7 +96,7 @@ export async function PUT(req: NextRequest) {
 | --- | --- | --- |
 | `src/app/api/users/me/route.ts` | 変更 | try/catch統一、emailバリデーション、P2002ハンドリング |
 | `src/app/api/users/me/route.test.ts` | 新規 | ユニットテスト6件 |
-| `docs/30-users-me-PUT-エラーハンドリング修正まとめ.md` | 新規 | 本ドキュメント |
+| `docs/32-users-me-PUT-エラーハンドリング修正まとめ.md` | 新規 | 本ドキュメント |
 
 ---
 
