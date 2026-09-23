@@ -15,10 +15,18 @@ import {
   isAuthenticated,
   getMe,
   updateMe,
+  changePassword,
   logout,
   getCachedUser,
   ApiClientError,
 } from "@/lib/apiClient";
+import {
+  MAX_PASSWORD_BYTES,
+  MIN_PASSWORD_LENGTH,
+  normalizePassword,
+  isPasswordLongEnough,
+  isPasswordWithinBcryptLimit,
+} from "@/lib/validation";
 
 const AVATAR_COLORS = [
   "#c9a227",
@@ -44,6 +52,10 @@ export default function ProfilePage() {
   const [avatarDirty, setAvatarDirty] = useState(false);
   const [userId, setUserId] = useState("u1");
   const [saving, setSaving] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -158,6 +170,46 @@ export default function ProfilePage() {
       }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword.trim()) {
+      toast.error("現在のパスワードを入力してください");
+      return;
+    }
+    // サーバー側もnormalizePassword(trim)後の値をハッシュ化・保存するため、
+    // 検証・一致確認・送信を全て同じ値(正規化後)で揃える。confirmPassword側の
+    // 比較を生の値のまま行うと、newPasswordだけtrimした値と食い違い、
+    // 実際には一致しているのに「一致しません」と誤判定してしまう。
+    const trimmedNewPassword = normalizePassword(newPassword);
+    if (!isPasswordLongEnough(newPassword)) {
+      toast.error(`新しいパスワードは${MIN_PASSWORD_LENGTH}文字以上で入力してください`);
+      return;
+    }
+    if (!isPasswordWithinBcryptLimit(newPassword)) {
+      toast.error(`新しいパスワードは${MAX_PASSWORD_BYTES}バイト以下で入力してください`);
+      return;
+    }
+    if (trimmedNewPassword !== normalizePassword(confirmPassword)) {
+      toast.error("新しいパスワードが一致しません");
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await changePassword(currentPassword, trimmedNewPassword);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      toast.success("パスワードを変更しました");
+    } catch (e) {
+      if (e instanceof ApiClientError) {
+        toast.error(e.message);
+      } else {
+        toast.error("パスワードの変更に失敗しました");
+      }
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -285,6 +337,43 @@ export default function ProfilePage() {
           <PrimaryButton onClick={handleSave} loading={saving}>
             保存する
           </PrimaryButton>
+        </section>
+
+        <section className="w-full rounded-2xl border border-[#e5e0d8] dark:border-[#333230] bg-white/70 dark:bg-[#1a1917] p-5">
+          <h2 className="text-base font-bold text-[#2d2a26] dark:text-[#eae7e1] mb-4">
+            パスワード変更
+          </h2>
+          <div className="flex flex-col gap-4 w-full">
+            <TextInput
+              label="現在のパスワード"
+              type="password"
+              placeholder="現在のパスワードを入力"
+              value={currentPassword}
+              onChange={setCurrentPassword}
+              disabled={changingPassword}
+            />
+            <TextInput
+              label="新しいパスワード"
+              type="password"
+              placeholder={`${MIN_PASSWORD_LENGTH}文字以上で入力`}
+              value={newPassword}
+              onChange={setNewPassword}
+              disabled={changingPassword}
+            />
+            <TextInput
+              label="新しいパスワード（確認）"
+              type="password"
+              placeholder="もう一度入力"
+              value={confirmPassword}
+              onChange={setConfirmPassword}
+              disabled={changingPassword}
+            />
+          </div>
+          <div className="mt-4">
+            <PrimaryButton onClick={handleChangePassword} loading={changingPassword}>
+              パスワードを変更する
+            </PrimaryButton>
+          </div>
         </section>
 
         <section className="w-full pt-1">

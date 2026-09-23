@@ -5,6 +5,7 @@ type TextInputProps = {
   value: string;
   onChange: (v: string) => void;
   error?: string;
+  disabled?: boolean;
 };
 
 export default function TextInput({
@@ -14,6 +15,7 @@ export default function TextInput({
   value,
   onChange,
   error,
+  disabled = false,
 }: TextInputProps) {
   return (
     <label className="w-full">
@@ -27,6 +29,7 @@ export default function TextInput({
           "text-[#2d2a26] dark:text-[#eae7e1]",
           "placeholder:text-[#b5b0a8] dark:placeholder:text-[#666360]",
           "transition-all duration-200 ease-out",
+          disabled ? "opacity-60 cursor-not-allowed" : "",
           error
             ? "ring-2 ring-red-400 focus:ring-red-500"
             : "focus:ring-2 focus:ring-[#c9a227] focus:border-[#c9a227]",
@@ -35,6 +38,7 @@ export default function TextInput({
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
       />
       {error && (
         <p className="text-xs text-red-500 mt-1 animate-[fade-in-up_0.2s_ease-out]">

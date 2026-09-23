@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import type { RegisterResponse, ApiError } from "@/types";
 import { prisma } from "@/lib/prisma";
-import { consumeRateLimit, getClientIp } from "@/lib/rateLimit";
+import { consumeRateLimit, getClientIp, tooManyRequestsResponse } from "@/lib/rateLimit";
+import {
+  MAX_PASSWORD_BYTES,
+  MIN_PASSWORD_LENGTH,
+  isPasswordLongEnough,
+  isPasswordWithinBcryptLimit,
+} from "@/lib/validation";
+import { hashPassword } from "@/lib/password";
 
 // IP単位: 大量アカウント自動作成(登録フォームへの総当たり)を制限
 const IP_LIMIT = { windowMs: 60 * 60 * 1000, max: 10 };
-
-function tooManyRequests(retryAfterSeconds: number) {
-  return NextResponse.json<ApiError>(
-    { error: "試行回数が多すぎます。しばらく待ってから再度お試しください" },
-    { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
-  );
-}
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -24,9 +23,22 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (typeof body.password !== "string" || !isPasswordLongEnough(body.password)) {
+    return NextResponse.json<ApiError>(
+      { error: `パスワードは${MIN_PASSWORD_LENGTH}文字以上で入力してください` },
+      { status: 400 }
+    );
+  }
+  if (!isPasswordWithinBcryptLimit(body.password)) {
+    return NextResponse.json<ApiError>(
+      { error: `パスワードは${MAX_PASSWORD_BYTES}バイト以下で入力してください` },
+      { status: 400 }
+    );
+  }
+
   const ip = getClientIp(req);
   const ipCheck = await consumeRateLimit(`register:ip:${ip}`, IP_LIMIT);
-  if (!ipCheck.allowed) return tooManyRequests(ipCheck.retryAfterSeconds);
+  if (!ipCheck.allowed) return tooManyRequestsResponse(ipCheck.retryAfterSeconds);
 
   // email 重複チェック
   const existing = await prisma.user.findUnique({
@@ -39,7 +51,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const passwordHash = await bcrypt.hash(body.password, 10);
+  // hashPassword内部でnormalizePassword(trim)してからハッシュ化する。
+  // ここで正規化前の値をhashすると、末尾の空白などがバリデーションを
+  // すり抜けたままハッシュ化され、ログイン時に入力した値と一致しなくなる。
+  const passwordHash = await hashPassword(body.password);
 
   const user = await prisma.user.create({
     data: {
