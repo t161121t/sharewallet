@@ -48,3 +48,7 @@ dev.db
 prisma/dev.db
 prisma/dev.db-journal
 prisma/dev.db-wal
+
+# Claude Code のローカル設定・作業コピー
+/.claude/settings.local.json
+/.claude/worktrees/
