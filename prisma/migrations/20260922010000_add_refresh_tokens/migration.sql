@@ -5,6 +5,7 @@ CREATE TABLE "refresh_tokens" (
     "token_hash" TEXT NOT NULL,
     "expires_at" TIMESTAMP(3) NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "session_started_at" TIMESTAMP(3) NOT NULL,
     "revoked_at" TIMESTAMP(3),
 
     CONSTRAINT "refresh_tokens_pkey" PRIMARY KEY ("id")

@@ -121,13 +121,18 @@ model RateLimitEntry {
 /// 過ぎるまで残す)。これにより、既に使用済みのはずのトークンが再度提示された場合に
 /// 「盗難によるコピーの再利用」として検知できる(rotateRefreshToken参照)。削除は
 /// expiresAt を過ぎた行のみ、確率的なクリーンアップで行う(rate_limit_entriesと同じ方式)。
+///
+/// sessionStartedAt は最初のログイン時刻をローテーションを跨いで引き継ぐ値で、
+/// スライディングウィンドウ(expiresAt、毎回30日延長)とは別に、ログインから
+/// 一定期間を過ぎたら無条件で再ログインを要求する絶対有効期限の起点として使う。
 model RefreshToken {
-  id        String    @id @default(cuid())
-  userId    String    @map("user_id")
-  tokenHash String    @unique @map("token_hash")
-  expiresAt DateTime  @map("expires_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-  revokedAt DateTime? @map("revoked_at")
+  id               String    @id @default(cuid())
+  userId           String    @map("user_id")
+  tokenHash        String    @unique @map("token_hash")
+  expiresAt        DateTime  @map("expires_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  sessionStartedAt DateTime  @map("session_started_at")
+  revokedAt        DateTime? @map("revoked_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
