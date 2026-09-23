@@ -3,7 +3,12 @@ import type { ApiError } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { requireAuthUserId } from "@/lib/auth";
 import { consumeRateLimit, tooManyRequestsResponse } from "@/lib/rateLimit";
-import { MIN_PASSWORD_LENGTH, isPasswordLongEnough } from "@/lib/validation";
+import {
+  MAX_PASSWORD_BYTES,
+  MIN_PASSWORD_LENGTH,
+  isPasswordLongEnough,
+  isPasswordWithinBcryptLimit,
+} from "@/lib/validation";
 import { hashPassword, verifyPassword } from "@/lib/password";
 
 // 本人(userId)単位: 認証Cookieを窃取した攻撃者が現在のパスワードを
@@ -33,6 +38,12 @@ export async function PUT(req: NextRequest) {
     if (!isPasswordLongEnough(body.newPassword)) {
       return NextResponse.json<ApiError>(
         { error: `新しいパスワードは${MIN_PASSWORD_LENGTH}文字以上で入力してください` },
+        { status: 400 }
+      );
+    }
+    if (!isPasswordWithinBcryptLimit(body.newPassword)) {
+      return NextResponse.json<ApiError>(
+        { error: `新しいパスワードは${MAX_PASSWORD_BYTES}バイト以下で入力してください` },
         { status: 400 }
       );
     }

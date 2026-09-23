@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import type { RegisterResponse, ApiError } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { consumeRateLimit, getClientIp, tooManyRequestsResponse } from "@/lib/rateLimit";
-import { MIN_PASSWORD_LENGTH, isPasswordLongEnough } from "@/lib/validation";
+import {
+  MAX_PASSWORD_BYTES,
+  MIN_PASSWORD_LENGTH,
+  isPasswordLongEnough,
+  isPasswordWithinBcryptLimit,
+} from "@/lib/validation";
 import { hashPassword } from "@/lib/password";
 
 // IP単位: 大量アカウント自動作成(登録フォームへの総当たり)を制限
@@ -21,6 +26,12 @@ export async function POST(req: NextRequest) {
   if (typeof body.password !== "string" || !isPasswordLongEnough(body.password)) {
     return NextResponse.json<ApiError>(
       { error: `パスワードは${MIN_PASSWORD_LENGTH}文字以上で入力してください` },
+      { status: 400 }
+    );
+  }
+  if (!isPasswordWithinBcryptLimit(body.password)) {
+    return NextResponse.json<ApiError>(
+      { error: `パスワードは${MAX_PASSWORD_BYTES}バイト以下で入力してください` },
       { status: 400 }
     );
   }

@@ -92,6 +92,21 @@ describe("POST /api/auth/login", () => {
     expect(res.status).toBe(401);
   });
 
+  it("空白のない誤ったパスワードはbcryptで一度だけ照合する", async () => {
+    mockFindUnique.mockResolvedValue(USER);
+    mockCompare.mockResolvedValue(false);
+
+    const res = await POST(
+      createJsonRequest(URL, {
+        method: "POST",
+        body: { email: "taro@example.com", password: "wrong-password" },
+      })
+    );
+
+    expect(res.status).toBe(401);
+    expect(mockCompare).toHaveBeenCalledTimes(1);
+  });
+
   it("末尾に空白のあるパスワードでも、正規化(trim)された値で照合する", async () => {
     mockFindUnique.mockResolvedValue(USER);
     mockCompare.mockResolvedValue(true);

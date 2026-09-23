@@ -113,6 +113,23 @@ describe("PUT /api/users/me/password", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
+  it("新しいパスワードが正規化後に72バイトを超えると400を返す", async () => {
+    const res = await PUT(
+      createJsonRequest(URL, {
+        method: "PUT",
+        // 「あ」はUTF-8で3バイトなので25文字は75バイトになる。
+        body: { currentPassword: "old-pass", newPassword: "あ".repeat(25) },
+      })
+    );
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: "新しいパスワードは72バイト以下で入力してください",
+    });
+    expect(mockCompare).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
   it("試行回数が上限を超えたら429を返す", async () => {
     mockConsumeRateLimit.mockResolvedValue({ allowed: false, retryAfterSeconds: 60 });
 
@@ -154,6 +171,7 @@ describe("PUT /api/users/me/password", () => {
     );
 
     expect(res.status).toBe(401);
+    expect(mockCompare).toHaveBeenCalledTimes(1);
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 

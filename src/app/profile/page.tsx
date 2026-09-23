@@ -20,7 +20,13 @@ import {
   getCachedUser,
   ApiClientError,
 } from "@/lib/apiClient";
-import { MIN_PASSWORD_LENGTH, normalizePassword, isPasswordLongEnough } from "@/lib/validation";
+import {
+  MAX_PASSWORD_BYTES,
+  MIN_PASSWORD_LENGTH,
+  normalizePassword,
+  isPasswordLongEnough,
+  isPasswordWithinBcryptLimit,
+} from "@/lib/validation";
 
 const AVATAR_COLORS = [
   "#c9a227",
@@ -179,6 +185,10 @@ export default function ProfilePage() {
     const trimmedNewPassword = normalizePassword(newPassword);
     if (!isPasswordLongEnough(newPassword)) {
       toast.error(`新しいパスワードは${MIN_PASSWORD_LENGTH}文字以上で入力してください`);
+      return;
+    }
+    if (!isPasswordWithinBcryptLimit(newPassword)) {
+      toast.error(`新しいパスワードは${MAX_PASSWORD_BYTES}バイト以下で入力してください`);
       return;
     }
     if (trimmedNewPassword !== normalizePassword(confirmPassword)) {

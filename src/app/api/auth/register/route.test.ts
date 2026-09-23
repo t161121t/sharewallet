@@ -72,6 +72,22 @@ describe("POST /api/auth/register", () => {
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
+  it("正規化後に72バイトを超えるパスワードは400を返す", async () => {
+    const res = await POST(
+      createJsonRequest(URL, {
+        method: "POST",
+        // 「あ」はUTF-8で3バイトなので25文字は75バイトになる。
+        body: { name: "太郎", email: "taro@example.com", password: "あ".repeat(25) },
+      })
+    );
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: "パスワードは72バイト以下で入力してください",
+    });
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
   it("正しい入力なら登録し、trim後のパスワードをハッシュ化する", async () => {
     mockHash.mockResolvedValue("hashed");
     mockCreate.mockResolvedValue({

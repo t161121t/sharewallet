@@ -20,6 +20,11 @@ export async function verifyPassword(
   passwordHash: string
 ): Promise<boolean> {
   if (typeof rawPassword !== "string") return false;
-  if (await bcrypt.compare(normalizePassword(rawPassword), passwordHash)) return true;
+  const normalizedPassword = normalizePassword(rawPassword);
+  if (await bcrypt.compare(normalizedPassword, passwordHash)) return true;
+
+  // 空白を含まない入力は正規化前後で同じ値になるため、失敗時に同じbcrypt照合を
+  // 繰り返さない。異なる場合だけ、正規化導入前のハッシュとの互換性を保つ。
+  if (normalizedPassword === rawPassword) return false;
   return bcrypt.compare(rawPassword, passwordHash);
 }
