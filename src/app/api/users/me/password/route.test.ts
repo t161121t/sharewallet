@@ -5,6 +5,7 @@ const {
   mockFindUnique,
   mockUpdate,
   mockRequireAuthUserId,
+  mockRevokeAllRefreshTokensForUser,
   mockCompare,
   mockHash,
   mockConsumeRateLimit,
@@ -12,6 +13,7 @@ const {
   mockFindUnique: vi.fn(),
   mockUpdate: vi.fn(),
   mockRequireAuthUserId: vi.fn(),
+  mockRevokeAllRefreshTokensForUser: vi.fn(),
   mockCompare: vi.fn(),
   mockHash: vi.fn(),
   mockConsumeRateLimit: vi.fn(),
@@ -25,6 +27,7 @@ vi.mock("@/lib/prisma", () => ({
 
 vi.mock("@/lib/auth", () => ({
   requireAuthUserId: mockRequireAuthUserId,
+  revokeAllRefreshTokensForUser: mockRevokeAllRefreshTokensForUser,
 }));
 
 vi.mock("bcryptjs", () => ({
@@ -49,6 +52,7 @@ describe("PUT /api/users/me/password", () => {
     vi.clearAllMocks();
     mockRequireAuthUserId.mockResolvedValue(USER_ID);
     mockConsumeRateLimit.mockResolvedValue({ allowed: true });
+    mockRevokeAllRefreshTokensForUser.mockResolvedValue(undefined);
   });
 
   it("未認証は401を返す", async () => {
@@ -257,5 +261,37 @@ describe("PUT /api/users/me/password", () => {
       where: { id: USER_ID },
       data: { passwordHash: "new-hash" },
     });
+  });
+
+  it("パスワード変更に成功したら、このユーザーの全リフレッシュトークンを失効させる", async () => {
+    mockFindUnique.mockResolvedValue({ id: USER_ID, passwordHash: "stored-hash" });
+    mockCompare.mockResolvedValue(true);
+    mockHash.mockResolvedValue("new-hash");
+    mockUpdate.mockResolvedValue({});
+
+    const res = await PUT(
+      createJsonRequest(URL, {
+        method: "PUT",
+        body: { currentPassword: "old-pass", newPassword: "new-pass-123" },
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockRevokeAllRefreshTokensForUser).toHaveBeenCalledWith(USER_ID);
+  });
+
+  it("現在のパスワードが誤っている場合は、リフレッシュトークンを失効させない", async () => {
+    mockFindUnique.mockResolvedValue({ id: USER_ID, passwordHash: "stored-hash" });
+    mockCompare.mockResolvedValue(false);
+
+    const res = await PUT(
+      createJsonRequest(URL, {
+        method: "PUT",
+        body: { currentPassword: "wrong-pass", newPassword: "new-pass-123" },
+      })
+    );
+
+    expect(res.status).toBe(401);
+    expect(mockRevokeAllRefreshTokensForUser).not.toHaveBeenCalled();
   });
 });

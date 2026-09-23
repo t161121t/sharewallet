@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { LoginResponse, ApiError } from "@/types";
 import { prisma } from "@/lib/prisma";
-import { createToken, setAuthCookies } from "@/lib/auth";
+import { createToken, issueRefreshToken, setAuthCookies } from "@/lib/auth";
 import { consumeRateLimit, getClientIp, tooManyRequestsResponse } from "@/lib/rateLimit";
 import { verifyPassword } from "@/lib/password";
 
@@ -45,7 +45,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const token = await createToken(user.id);
+  const accessToken = await createToken(user.id);
+  const refreshToken = await issueRefreshToken(user.id);
 
   const res = NextResponse.json<LoginResponse>({
     user: {
@@ -56,6 +57,6 @@ export async function POST(req: NextRequest) {
       avatarUrl: user.avatarUrl ?? undefined,
     },
   });
-  setAuthCookies(res, token);
+  setAuthCookies(res, accessToken, refreshToken);
   return res;
 }

@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
+import { probabilisticCleanup } from "@/lib/cleanup";
 import type { ApiError } from "@/types";
 
 export type RateLimitResult =
@@ -23,10 +24,6 @@ type RateLimitOptions = {
   max: number;
 };
 
-// 期限切れの rate_limit_entries 行を毎回チェックすると無駄なので、
-// この確率でだけ掃除する(厳密なTTLではなく、テーブルが無制限に肥大化しない程度の簡易対策)。
-const CLEANUP_PROBABILITY = 0.01;
-
 /**
  * key ごとに固定ウィンドウ方式で試行回数を数え、max を超えたらブロックする。
  *
@@ -43,12 +40,9 @@ export async function consumeRateLimit(
   const now = new Date();
   const newExpiresAt = new Date(now.getTime() + windowMs);
 
-  if (Math.random() < CLEANUP_PROBABILITY) {
-    // 掃除に失敗してもレート制限の可否判定自体は継続させる
-    await prisma.rateLimitEntry
-      .deleteMany({ where: { expiresAt: { lt: now } } })
-      .catch(() => undefined);
-  }
+  await probabilisticCleanup(() =>
+    prisma.rateLimitEntry.deleteMany({ where: { expiresAt: { lt: now } } })
+  );
 
   const rows = await prisma.$queryRaw<{ count: number; expiresAt: Date }[]>(
     Prisma.sql`
