@@ -1,4 +1,4 @@
-# 35. JWTリフレッシュトークン実装まとめ
+# 36. JWTリフレッシュトークン実装まとめ
 
 ## これは何のドキュメント？
 
@@ -10,13 +10,15 @@
 
 - アクセストークン(JWT)の有効期限を **7日 → 30分** に短縮した
 - 30分ごとに再ログインさせるのではなく、別途 **リフレッシュトークン(30日)** をDBで管理し、`POST /api/auth/refresh` でサイレントに新しいアクセストークンへ更新できるようにした
-- リフレッシュトークンは **使うたびにローテーション**(古いものを削除し新しいものを発行)し、再利用(リプレイ)を防ぐ
+- リフレッシュトークンは **使うたびにローテーション**(古いものを「使用済み」にマークし新しいものを発行)し、再利用(リプレイ)を防ぐ
+- **既に使用済みのトークンが再び提示された場合(reuse)は、盗難の兆候とみなしそのユーザーの全端末のリフレッシュトークンを失効**させる
+- **パスワード変更が成功したら、変更に使ったデバイスも含めて全端末のリフレッシュトークンを失効**させる(乗っ取りが疑われる状況を想定した対応)
 - フロントエンド(`apiClient.ts`)は401を受けたら自動で1回だけリフレッシュを試み、成功すれば元のリクエストを再試行する — ユーザーは何も気づかないままセッションが延長される
 - ログアウト時はDB上のリフレッシュトークンも確実に失効させる
 
 ```bash
 npx tsc --noEmit   # 型エラーなし
-npx vitest run     # Test Files 5 passed / Tests 42 passed(新規 auth.refresh.test.ts 6件を含む)
+npx vitest run     # Test Files 10 passed / Tests 89 passed(auth.refresh.test.ts 8件を含む)
 ```
 
 **⚠️ 重要: 本番DBへのマイグレーション未適用**
@@ -69,9 +71,9 @@ npx vitest run     # Test Files 5 passed / Tests 42 passed(新規 auth.refresh.t
 
 | やらなかったこと | 理由 |
 | --- | --- |
-| 複数タブ/複数デバイスでの同時リフレッシュの完全な整合性担保 | クライアント側で同一タブ内の同時リクエストによる二重リフレッシュは`refreshInFlight`のPromiseキャッシュで防いでいるが、別タブ・別デバイスでの競合(片方がローテーションした直後にもう片方が古いトークンでリフレッシュしようとして失敗するケース)までは対応していない。発生した場合はそのタブ側が単に再ログインを求められるだけで、致命的な不具合にはならないため今回は許容した |
-| リフレッシュトークンの使用履歴・監視(不審な複数箇所からの利用検知) | 運用開始後にログを見ながら必要性を判断すべき機能であり、今回のスコープ外 |
-| 全デバイスからの一斉ログアウト機能(ユーザーIDに紐づく全リフレッシュトークンの一括失効) | UIからの導線がまだ無い。`prisma.refreshToken.deleteMany({ where: { userId } })`で実装自体は容易なので、必要になったタイミングで追加できる |
+| 複数タブ/複数デバイスでの同時リフレッシュの完全な整合性担保 | クライアント側で同一タブ内の同時リクエストによる二重リフレッシュは`refreshInFlight`のPromiseキャッシュで防いでいるが、別タブ・別デバイスでの競合(片方がローテーションした直後にもう片方が古いトークンでリフレッシュしようとして失敗するケース)までは対応していない。発生した場合はそのタブ側が単に再ログインを求められるだけで、致命的な不具合にはならないため今回は許容した。**ただし後述の通り、このケースはreuse検知の仕組み上「そのユーザーの全端末が強制ログアウトされる」形で顕在化する点に注意(下記FAQ参照)** |
+| リフレッシュトークンの使用履歴・監視(ダッシュボード等でのログ閲覧) | 運用開始後にログを見ながら必要性を判断すべき機能であり、今回のスコープ外。reuse検知そのものは実装済みだが、それを人が確認できるUIやアラートまでは用意していない |
+| ユーザー自身がUIから「他の端末からログアウト」を選べる機能 | サーバー側の関数(`revokeAllRefreshTokensForUser`)は用意したが、それを呼び出すUI・専用APIエンドポイントはまだ無い。プロフィール画面などに導線を追加するのは別issueとして切り出せる規模の話 |
 
 ---
 
@@ -81,11 +83,12 @@ npx vitest run     # Test Files 5 passed / Tests 42 passed(新規 auth.refresh.t
 
 ```prisma
 model RefreshToken {
-  id        String   @id @default(cuid())
-  userId    String   @map("user_id")
-  tokenHash String   @unique @map("token_hash")
-  expiresAt DateTime @map("expires_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  revokedAt DateTime? @map("revoked_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@map("refresh_tokens")
@@ -94,7 +97,9 @@ model RefreshToken {
 
 パスワードと同じ考え方で、トークンの生の値は保存せず`sha256`ハッシュのみ保存します。bcryptのような低速ハッシュを使わなかったのは、リフレッシュトークン自体が(パスワードと違って)人間が記憶する低エントロピーな値ではなく`crypto.randomBytes(32)`由来の高エントロピーな乱数値であり、総当たりで復元される心配がないためです。
 
-### 2. `src/lib/auth.ts` — トークンの発行・検証・失効
+`revokedAt`は当初(レビュー前)の設計には無く、後述の再利用検知のために追加しました。使用済み・失効済みの行を即座に削除せず、この列に印だけ付けて`expiresAt`まで残すようにしています。
+
+### 2. `src/lib/auth.ts` — トークンの発行・検証・失効・再利用検知
 
 ```ts
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 30;       // 30分
@@ -112,10 +117,26 @@ export async function issueRefreshToken(userId: string): Promise<string> {
 export async function rotateRefreshToken(oldToken: string) {
   const existing = await prisma.refreshToken.findUnique({ where: { tokenHash: hashRefreshToken(oldToken) } });
   if (!existing) return null;
-  await prisma.refreshToken.delete({ where: { id: existing.id } }); // 使い捨て
+
+  if (existing.revokedAt) {
+    // reuse検知: このトークンは既に使用済みのはず。盗まれたコピーが
+    // 別経路で使われた可能性があるため、そのユーザーの全トークンを失効させる。
+    await revokeAllRefreshTokensForUser(existing.userId);
+    return null;
+  }
+
+  await prisma.refreshToken.update({ where: { id: existing.id }, data: { revokedAt: new Date() } });
   if (existing.expiresAt <= new Date()) return null;
+
   const newToken = await issueRefreshToken(existing.userId);
   return { userId: existing.userId, token: newToken };
+}
+
+export async function revokeAllRefreshTokensForUser(userId: string): Promise<void> {
+  await prisma.refreshToken.updateMany({
+    where: { userId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
 }
 ```
 
@@ -154,7 +175,19 @@ async function apiFetch<T>(path: string, options: RequestInit = {}, isRetry = fa
 ### 6. login/logoutルートの更新
 
 - `login`: `createToken`(アクセス)と`issueRefreshToken`(リフレッシュ)の両方を発行しCookieにセット
-- `logout`: リフレッシュトークンCookieを読み、`revokeRefreshToken`でDBから削除してからCookieを破棄
+- `logout`: リフレッシュトークンCookieを読み、`revokeRefreshToken`で使用済みにマークしてからCookieを破棄
+
+### 7. 再利用検知(reuse detection)
+
+`rotateRefreshToken`は、提示されたトークンが**既に`revokedAt`が立っている(=使用済み)**行に一致した場合、それを「盗まれたトークンのコピーが別経路で使われた痕跡」とみなします。攻撃者・正規ユーザーのどちらが今アクセスしているかをサーバー側では区別できないため、安全側に倒して**そのユーザーが持つ全リフレッシュトークンを一括失効**させます。
+
+失効理由を問わず、`expiresAt`を過ぎた行は`rate_limit_entries`と同じ確率的クリーンアップ(1%の確率で期限切れ行を削除)で掃除しており、テーブルが無制限に肥大化しない設計にしています。
+
+### 8. パスワード変更時の全端末失効
+
+`PUT /api/users/me/password`が成功したら、そのリクエスト自身が使っているセッションも含めて`revokeAllRefreshTokensForUser`を呼び出します。パスワード変更は「アカウントの乗っ取りが疑われる」状況を含むため、変更と同時にリフレッシュトークンを盗んでいたかもしれない攻撃者を全端末から締め出せるようにしました。
+
+このデバイス自身もアクセストークン(30分)の期限が切れた時点で再ログインが必要になります。あえて「このデバイスだけ新しいリフレッシュトークンを発行し直す」という例外は設けていません。シンプルさを優先し、パスワードを変更した際は全端末で再ログインを求める、という一貫した挙動にしています。
 
 ---
 
@@ -162,15 +195,17 @@ async function apiFetch<T>(path: string, options: RequestInit = {}, isRetry = fa
 
 | ファイル | 種別 | 内容 |
 | --- | --- | --- |
-| `prisma/schema.prisma` | 変更 | `RefreshToken`モデル追加、`User`に`refreshTokens`リレーション追加 |
+| `prisma/schema.prisma` | 変更 | `RefreshToken`モデル追加(`revokedAt`列含む)、`User`に`refreshTokens`リレーション追加 |
 | `prisma/migrations/20260922010000_add_refresh_tokens/` | 新規 | `refresh_tokens`テーブル作成(本番未適用、要`migrate deploy`) |
-| `src/lib/auth.ts` | 変更 | アクセストークンTTL短縮、リフレッシュトークンの発行/検証/失効関数、Cookie設計の変更 |
-| `src/lib/auth.refresh.test.ts` | 新規 | リフレッシュトークン発行/ローテーション/失効のユニットテスト(6件) |
+| `src/lib/auth.ts` | 変更 | アクセストークンTTL短縮、リフレッシュトークンの発行/検証/失効関数、再利用検知、`revokeAllRefreshTokensForUser`、Cookie設計の変更 |
+| `src/lib/auth.refresh.test.ts` | 変更 | リフレッシュトークン発行/ローテーション/失効/再利用検知のユニットテスト(8件、削除ベースの旧実装用テストを新実装に合わせて全面書き換え) |
 | `src/app/api/auth/login/route.ts` | 変更 | リフレッシュトークンも発行するよう変更 |
 | `src/app/api/auth/logout/route.ts` | 変更 | リフレッシュトークンをDBから失効させるよう変更 |
 | `src/app/api/auth/refresh/route.ts` | 新規 | リフレッシュエンドポイント |
+| `src/app/api/users/me/password/route.ts` | 変更 | パスワード変更成功時に全端末のリフレッシュトークンを失効させるよう追加 |
+| `src/app/api/users/me/password/route.test.ts` | 変更 | 全端末失効を検証するテストを追加(2件) |
 | `src/lib/apiClient.ts` | 変更 | 401時の自動リフレッシュ&リトライ |
-| `docs/35-JWTリフレッシュトークン実装まとめ.md` | 新規 | 本ドキュメント |
+| `docs/36-JWTリフレッシュトークン実装まとめ.md` | 新規 | 本ドキュメント |
 
 ---
 
@@ -178,8 +213,10 @@ async function apiFetch<T>(path: string, options: RequestInit = {}, isRetry = fa
 
 ```
 npx tsc --noEmit   # 型エラーなし
-npx vitest run     # Test Files 5 passed / Tests 42 passed
+npx vitest run     # Test Files 10 passed / Tests 89 passed
 npx eslint <変更ファイル>  # 警告・エラーなし
+npx prisma validate  # スキーマ妥当性OK
+npx next build --turbopack  # ビルド成功
 ```
 
 ローカルDB接続でのログイン→30分待たずにトークン失効を模擬→自動リフレッシュ、という実UI確認は未実施(要ローカルPostgreSQL接続、かつ30分という時間の都合上、手動での実確認は別途行うことを推奨)。
@@ -192,8 +229,9 @@ npx eslint <変更ファイル>  # 警告・エラーなし
 | --- | --- | --- |
 | 中 | `npx prisma migrate deploy`を本番DBに適用 | **未実施(必須)** |
 | 中 | middleware.tsでの認証ガード一元化(issue #32)とあわせて、リフレッシュ処理もmiddleware側に寄せられないか検討 | 未着手 |
-| 低 | 全デバイスからの一斉ログアウトAPI | 未着手 |
-| 低 | リフレッシュトークンの使用ログ・異常検知 | 未着手 |
+| 低 | 「他の端末からログアウト」をユーザーがUIから操作できるようにする(サーバー側の`revokeAllRefreshTokensForUser`は実装済み) | 未着手 |
+| 低 | reuse検知(盗難の可能性)が発生したことをユーザーに通知する(メール等) | 未着手 |
+| 低 | リフレッシュトークンの使用ログ・ダッシュボード | 未着手 |
 
 ---
 
@@ -210,6 +248,18 @@ npx eslint <変更ファイル>  # 警告・エラーなし
 ### Q. なぜアクセストークンを30分にしたの？15分や1時間ではダメ？
 
 issueの提案(15分〜1時間)の範囲内で、ユーザーの操作の合間にリフレッシュが走る頻度とセキュリティのバランスを取って30分としました。極端に厳格な要件があるわけではないため、運用しながら調整可能な値としています。
+
+### Q. reuse検知で「全端末を失効」ではなく「そのトークンだけ」を無効にする選択肢は無かったの？
+
+検討しましたが採用しませんでした。reuseが起きたということは「同じトークンのコピーが2箇所以上に存在する」状態であり、サーバー側からはどちらが正規ユーザーでどちらが攻撃者かを区別する手段がありません。そのトークン1つだけを無効化しても、もう片方のコピー(攻撃者側かもしれない)は別のリフレッシュトークンとしてまだ生きている可能性があります。安全側に倒し、疑わしい状況が起きたら全端末を再ログイン必須にする、というシンプルで確実な方針にしました。
+
+### Q. 別タブ・別デバイスで同時にリフレッシュした場合、正規ユーザーなのに全端末ログアウトされることはある？
+
+理論上あり得ます。例えばタブA・Bを同時に開いていて、両方が同じ古いリフレッシュトークンを使ってほぼ同時にリフレッシュを試みた場合、先に処理された方(仮にA)が成功してトークンをローテーションし、後から処理されたB側は「既に使用済みのトークン」を提示したことになり、reuseとして検知されて全端末が失効します。この場合、正規ユーザー自身がその後改めてログインし直す必要があります。致命的な不具合ではなく、極端な頻度で連打するような状況でなければ起きにくいため、今回はこの挙動を許容しています。
+
+### Q. パスワード変更時、変更した本人もログアウトされてしまうのは不便では？
+
+即座にはログアウトされません。パスワード変更が成功した時点で既に発行済みのアクセストークン(JWT、最大30分)自体は失効させる手段が無い(ステートレスなため)ので、そのままそのアクセストークンの有効期限までは使えます。ただし、そのアクセストークンが切れた後にリフレッシュしようとすると、リフレッシュトークンは既に失効させているため再ログインが必要になります。「パスワードを変えたのに、盗まれたかもしれない古いセッションだけ生き残る」状態を避けることを優先した設計です。
 
 ---
 
