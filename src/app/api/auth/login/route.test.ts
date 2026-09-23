@@ -6,12 +6,14 @@ const {
   mockCompare,
   mockConsumeRateLimit,
   mockCreateToken,
+  mockIssueRefreshToken,
   mockSetAuthCookies,
 } = vi.hoisted(() => ({
   mockFindUnique: vi.fn(),
   mockCompare: vi.fn(),
   mockConsumeRateLimit: vi.fn(),
   mockCreateToken: vi.fn(),
+  mockIssueRefreshToken: vi.fn(),
   mockSetAuthCookies: vi.fn(),
 }));
 
@@ -27,6 +29,7 @@ vi.mock("bcryptjs", () => ({
 
 vi.mock("@/lib/auth", () => ({
   createToken: mockCreateToken,
+  issueRefreshToken: mockIssueRefreshToken,
   setAuthCookies: mockSetAuthCookies,
 }));
 
@@ -55,6 +58,7 @@ describe("POST /api/auth/login", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockConsumeRateLimit.mockResolvedValue({ allowed: true });
+    mockIssueRefreshToken.mockResolvedValue("refresh-token");
   });
 
   it("email/passwordが無いと400を返す", async () => {
@@ -124,7 +128,7 @@ describe("POST /api/auth/login", () => {
     // (register/password-changeがtrim後の値をハッシュ化・保存しているため、
     // ここで正規化しないと本人がログインできなくなる)
     expect(mockCompare).toHaveBeenCalledWith("password123", "stored-hash");
-    expect(mockSetAuthCookies).toHaveBeenCalledWith(expect.anything(), "token");
+    expect(mockSetAuthCookies).toHaveBeenCalledWith(expect.anything(), "token", "refresh-token");
   });
 
   it("正規化後の照合が失敗しても、生の値での照合(後方互換)が成功すればログインできる", async () => {
