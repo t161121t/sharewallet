@@ -101,6 +101,19 @@ function hashRefreshToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+// 失効済み(使用済み・ログアウト等)の行を毎回チェックすると無駄なので、
+// この確率でだけ期限切れ行を掃除する(rate_limit_entriesと同じ簡易対策)。
+const CLEANUP_PROBABILITY = 0.01;
+
+async function cleanupExpiredRefreshTokens(): Promise<void> {
+  if (Math.random() >= CLEANUP_PROBABILITY) return;
+  // 失効理由(使用済み/ログアウト/期限切れ)を問わず、期限を過ぎた行は
+  // 再利用検知の役目を終えているので削除してよい。
+  await prisma.refreshToken
+    .deleteMany({ where: { expiresAt: { lt: new Date() } } })
+    .catch(() => undefined);
+}
+
 /**
  * リフレッシュトークンを新規発行しDBに保存する(ハッシュのみ保存)。
  * 生の値は呼び出し元がCookieとして返す用にのみ使う。
@@ -110,15 +123,21 @@ export async function issueRefreshToken(userId: string): Promise<string> {
   const tokenHash = hashRefreshToken(token);
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000);
   await prisma.refreshToken.create({ data: { userId, tokenHash, expiresAt } });
+  await cleanupExpiredRefreshTokens();
   return token;
 }
 
 /**
- * リフレッシュトークンを検証し、有効なら「使い捨て」にして新しいトークンを発行し直す
- * (ローテーション)。同じトークンでの再利用(リプレイ)を防ぐため、検証成功時は
- * 古いトークンを必ず削除してから新しいトークンを発行する。
+ * リフレッシュトークンを検証し、有効なら「使用済み」にマークして新しいトークンを
+ * 発行し直す(ローテーション)。
  *
- * 戻り値が null の場合(未登録・期限切れ)は呼び出し元で401として扱うこと。
+ * 使用済みの行は即座に削除せず revokedAt を立てて残す(expiresAtまでは保持)。
+ * これにより、既に使用済みのはずのトークンが再び提示された場合(=盗まれたトークンの
+ * コピーがどこかで使われた痕跡)を「reuse」として検知できる。reuseを検知したら、
+ * 攻撃者・正規ユーザーのどちらが今アクセスしているか区別できないため、安全側に倒して
+ * そのユーザーの全リフレッシュトークンを無効化する(=全端末を再ログイン必須にする)。
+ *
+ * 戻り値が null の場合(未登録・期限切れ・reuse検知)は呼び出し元で401として扱うこと。
  */
 export async function rotateRefreshToken(
   oldToken: string
@@ -130,8 +149,17 @@ export async function rotateRefreshToken(
 
   if (!existing) return null;
 
-  // 期限切れ・有効いずれの場合も、この値は使い終わりなので必ず削除する
-  await prisma.refreshToken.delete({ where: { id: existing.id } }).catch(() => undefined);
+  if (existing.revokedAt) {
+    // reuse検知: このトークンは既に使用済み(または明示的に失効済み)のはず。
+    // 攻撃者がコピーを使っている可能性があるため、念のため全端末を失効させる。
+    await revokeAllRefreshTokensForUser(existing.userId);
+    return null;
+  }
+
+  await prisma.refreshToken.update({
+    where: { id: existing.id },
+    data: { revokedAt: new Date() },
+  });
 
   if (existing.expiresAt <= new Date()) return null;
 
@@ -139,10 +167,25 @@ export async function rotateRefreshToken(
   return { userId: existing.userId, token: newToken };
 }
 
-/** ログアウト・失効時に特定のリフレッシュトークンをDBから削除する */
+/** ログアウト・失効時に特定のリフレッシュトークンを使用済みにマークする */
 export async function revokeRefreshToken(token: string): Promise<void> {
   const tokenHash = hashRefreshToken(token);
-  await prisma.refreshToken.deleteMany({ where: { tokenHash } });
+  await prisma.refreshToken.updateMany({
+    where: { tokenHash, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+  await cleanupExpiredRefreshTokens();
+}
+
+/**
+ * 指定ユーザーが持つ、まだ有効な(未失効の)リフレッシュトークンを全て失効させる。
+ * パスワード変更時(乗っ取りが疑われる状況)や、reuse検知時の全端末ログアウトに使う。
+ */
+export async function revokeAllRefreshTokensForUser(userId: string): Promise<void> {
+  await prisma.refreshToken.updateMany({
+    where: { userId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
 }
 
 /** ログイン成功時・リフレッシュ成功時に認証 Cookie 一式をレスポンスへ付与する */

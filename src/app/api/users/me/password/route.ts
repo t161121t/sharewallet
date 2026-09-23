@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { ApiError } from "@/types";
 import { prisma } from "@/lib/prisma";
-import { requireAuthUserId } from "@/lib/auth";
+import { requireAuthUserId, revokeAllRefreshTokensForUser } from "@/lib/auth";
 import { consumeRateLimit, tooManyRequestsResponse } from "@/lib/rateLimit";
 import {
   MAX_PASSWORD_BYTES,
@@ -87,6 +87,13 @@ export async function PUT(req: NextRequest) {
       where: { id: userId },
       data: { passwordHash },
     });
+
+    // パスワードを変更する状況は「乗っ取りが疑われる」ケースを含むため、
+    // このリクエスト自身が使っているものも含め、このユーザーの全リフレッシュ
+    // トークンを失効させる。攻撃者がリフレッシュトークンを盗んでいた場合でも、
+    // パスワード変更と同時に締め出せるようにするため(このデバイスも含め、
+    // 次にアクセストークンが切れた時点で全端末が再ログイン必須になる)。
+    await revokeAllRefreshTokensForUser(userId);
 
     return NextResponse.json<{ ok: boolean }>({ ok: true });
   } catch (e) {

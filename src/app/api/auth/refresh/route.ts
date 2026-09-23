@@ -12,6 +12,8 @@ import {
  * POST /api/auth/refresh
  * リフレッシュトークン(Cookie)を検証し、新しいアクセストークンとリフレッシュトークンを発行する。
  * リフレッシュトークンは検証成功時に必ずローテーション(使い捨て)される。
+ * 既に使用済みのトークンが再提示された場合(reuse)は、rotateRefreshToken内部で
+ * そのユーザーの全トークンが失効させられ、ここでは通常の無効トークンと同様401を返す。
  */
 export async function POST(req: NextRequest) {
   const refreshToken = req.cookies.get(REFRESH_COOKIE_NAME)?.value;
