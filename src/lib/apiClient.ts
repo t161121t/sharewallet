@@ -16,6 +16,7 @@ import type {
   CategoryName,
   ExpenseShare,
   DashboardSummary,
+  MonthlyTrendResult,
   SettlementResult,
   ReceiptAnalysisResult,
 } from "@/types";
@@ -279,8 +280,15 @@ export async function getExpenses(groupId: string): Promise<ExpenseRecord[]> {
   return apiFetch<ExpenseRecord[]>(`/api/groups/${groupId}/expenses`);
 }
 
-export async function getDashboardSummary(): Promise<DashboardSummary> {
-  return apiFetch<DashboardSummary>("/api/dashboard/summary");
+export async function getDashboardSummary(
+  yearMonth?: { year: number; month: number }
+): Promise<DashboardSummary> {
+  const query = yearMonth ? `?year=${yearMonth.year}&month=${yearMonth.month}` : "";
+  return apiFetch<DashboardSummary>(`/api/dashboard/summary${query}`);
+}
+
+export async function getDashboardTrend(months = 6): Promise<MonthlyTrendResult> {
+  return apiFetch<MonthlyTrendResult>(`/api/dashboard/summary/trend?months=${months}`);
 }
 
 export async function createExpense(
