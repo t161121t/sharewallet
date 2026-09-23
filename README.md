@@ -51,8 +51,8 @@
 ## セットアップ（初回）
 
 ```bash
-git clone https://github.com/t161121t/sharewallet_frontend.git
-cd sharewallet_frontend
+git clone https://github.com/t161121t/sharewallet.git
+cd sharewallet
 npm install
 ```
 
@@ -103,12 +103,16 @@ npm run dev
 ```bash
 npm run dev      # 開発サーバー（Turbopack）
 npm run lint     # ESLint
+npm run typecheck # TypeScript 型チェック
+npm test         # テストを一度実行
 npm run build    # 本番ビルド
 ```
 
 ---
 
 ## ディレクトリの目安（読む順）
+
+AI を使った開発では、共通ルールの [`CLAUDE.md`](CLAUDE.md) と、Codex 向けの [`AGENTS.md`](AGENTS.md) を参照してください。PR テンプレートと学習用ドキュメントの作成ルールを共有しています。
 
 | パス | 内容 |
 |------|------|

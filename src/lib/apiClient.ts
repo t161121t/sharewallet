@@ -224,6 +224,16 @@ export async function getMe(): Promise<UserProfile> {
   return apiFetch<UserProfile>("/api/users/me");
 }
 
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>("/api/users/me/password", {
+    method: "PUT",
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
+
 export async function updateMe(
   profile: Partial<UserProfile>
 ): Promise<UserProfile> {
