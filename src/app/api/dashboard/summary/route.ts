@@ -22,15 +22,32 @@ function normalizeCategory(category: string): CategoryName {
   return "その他";
 }
 
-/** GET /api/dashboard/summary - ホーム表示用の今月集計 */
+function getPeriod(searchParams: URLSearchParams) {
+  const now = new Date();
+  const requestedYear = searchParams.get("year");
+  const requestedMonth = searchParams.get("month");
+  const year = requestedYear === null ? now.getFullYear() : Number(requestedYear);
+  const month = requestedMonth === null ? now.getMonth() + 1 : Number(requestedMonth);
+
+  if (!Number.isInteger(year) || !Number.isInteger(month) || year < 2000 || year > 2100 || month < 1 || month > 12) {
+    return null;
+  }
+
+  return { year, month, periodFrom: new Date(year, month - 1, 1) };
+}
+
+/** GET /api/dashboard/summary?year=2026&month=9 - 指定月の個人支出集計 */
 export async function GET(req: NextRequest) {
   try {
     const userId = await requireAuthUserId(req);
-    const now = new Date();
-    const periodFrom = new Date(now.getFullYear(), now.getMonth(), 1);
-    const periodTo = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    const prevFrom = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const prevTo = new Date(now.getFullYear(), now.getMonth(), 1);
+    const period = getPeriod(req.nextUrl.searchParams);
+    if (!period) {
+      return NextResponse.json<ApiError>({ error: "year は2000〜2100、month は1〜12で指定してください" }, { status: 400 });
+    }
+    const { year, month, periodFrom } = period;
+    const periodTo = new Date(year, month, 1);
+    const prevFrom = new Date(year, month - 2, 1);
+    const prevTo = periodFrom;
 
     const expenses = await prisma.expense.findMany({
       where: {
@@ -111,7 +128,7 @@ export async function GET(req: NextRequest) {
       period: {
         from: periodFrom.toISOString(),
         to: periodTo.toISOString(),
-        label: "今月",
+        label: `${year}年${month}月`,
       },
     };
 

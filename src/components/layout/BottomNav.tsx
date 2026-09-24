@@ -40,6 +40,15 @@ const STATIC_ITEMS: NavItem[] = [
       </svg>
     ),
   },
+  {
+    href: "/analysis",
+    label: "分析",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" width={24} height={24}>
+        <path d="M4 19h16v2H2V3h2v16zm3-2H5v-5h2v5zm5 0h-2V7h2v10zm5 0h-2V4h2v13z" />
+      </svg>
+    ),
+  },
 ];
 
 const PROFILE_FALLBACK_ICON = (

@@ -170,3 +170,37 @@ export type DashboardSummary = {
     label: string;
   };
 };
+
+/** カレンダーに表示する、ある月の1日分の支出 */
+export type DashboardCalendarExpense = {
+  id: string;
+  amount: number;
+  category: CategoryName;
+  memo: string | null;
+  groupName: string;
+};
+
+/** カレンダーに表示する日ごとの個人支出 */
+export type DashboardCalendarDay = {
+  date: string;
+  totalPersonalAmount: number;
+  expenseCount: number;
+  expenses: DashboardCalendarExpense[];
+};
+
+export type DashboardCalendar = {
+  year: number;
+  month: number;
+  days: DashboardCalendarDay[];
+};
+
+export type DashboardTrendPoint = {
+  year: number;
+  month: number;
+  label: string;
+  totalPersonalAmount: number;
+};
+
+export type DashboardTrend = {
+  points: DashboardTrendPoint[];
+};
