@@ -314,17 +314,25 @@ export async function getExpenses(groupId: string): Promise<ExpenseRecord[]> {
   return apiFetch<ExpenseRecord[]>(`/api/groups/${groupId}/expenses`);
 }
 
+function dashboardQuery(year?: number, month?: number) {
+  const params = new URLSearchParams();
+  if (year && month) { params.set("year", String(year)); params.set("month", String(month)); }
+  if (typeof window !== "undefined") params.set("timeZone", Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
 export async function getDashboardSummary(year?: number, month?: number): Promise<DashboardSummary> {
-  const query = year && month ? `?year=${year}&month=${month}` : "";
+  const query = dashboardQuery(year, month);
   return apiFetch<DashboardSummary>(`/api/dashboard/summary${query}`);
 }
 
 export async function getDashboardCalendar(year: number, month: number): Promise<DashboardCalendar> {
-  return apiFetch<DashboardCalendar>(`/api/dashboard/calendar?year=${year}&month=${month}`);
+  return apiFetch<DashboardCalendar>(`/api/dashboard/calendar${dashboardQuery(year, month)}`);
 }
 
 export async function getDashboardTrend(year: number, month: number): Promise<DashboardTrend> {
-  return apiFetch<DashboardTrend>(`/api/dashboard/trend?year=${year}&month=${month}`);
+  return apiFetch<DashboardTrend>(`/api/dashboard/trend${dashboardQuery(year, month)}`);
 }
 
 export async function createExpense(

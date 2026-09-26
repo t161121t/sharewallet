@@ -8,6 +8,7 @@ import type {
 } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { requireAuthUserId } from "@/lib/auth";
+import { getDashboardPeriod, zonedStartOfDay } from "@/lib/dashboardTime";
 
 function normalizeCategory(category: string): CategoryName {
   if (category === "交通費") return "交通";
@@ -22,31 +23,17 @@ function normalizeCategory(category: string): CategoryName {
   return "その他";
 }
 
-function getPeriod(searchParams: URLSearchParams) {
-  const now = new Date();
-  const requestedYear = searchParams.get("year");
-  const requestedMonth = searchParams.get("month");
-  const year = requestedYear === null ? now.getFullYear() : Number(requestedYear);
-  const month = requestedMonth === null ? now.getMonth() + 1 : Number(requestedMonth);
-
-  if (!Number.isInteger(year) || !Number.isInteger(month) || year < 2000 || year > 2100 || month < 1 || month > 12) {
-    return null;
-  }
-
-  return { year, month, periodFrom: new Date(year, month - 1, 1) };
-}
-
 /** GET /api/dashboard/summary?year=2026&month=9 - 指定月の個人支出集計 */
 export async function GET(req: NextRequest) {
   try {
     const userId = await requireAuthUserId(req);
-    const period = getPeriod(req.nextUrl.searchParams);
+    const period = getDashboardPeriod(req.nextUrl.searchParams);
     if (!period) {
       return NextResponse.json<ApiError>({ error: "year は2000〜2100、month は1〜12で指定してください" }, { status: 400 });
     }
-    const { year, month, periodFrom } = period;
-    const periodTo = new Date(year, month, 1);
-    const prevFrom = new Date(year, month - 2, 1);
+    const { year, month, from: periodFrom, to: periodTo, timeZone } = period;
+    const previous = new Date(year, month - 2, 1);
+    const prevFrom = zonedStartOfDay(previous.getFullYear(), previous.getMonth() + 1, 1, timeZone);
     const prevTo = periodFrom;
 
     const expenses = await prisma.expense.findMany({

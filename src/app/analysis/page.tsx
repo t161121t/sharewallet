@@ -26,11 +26,13 @@ export default function AnalysisPage() {
 
   useEffect(() => {
     if (!isAuthenticated()) { router.replace("/login"); return; }
+    let isCurrent = true;
     setLoading(true); setError(null);
     Promise.all([getDashboardSummary(period.year, period.month), getDashboardTrend(period.year, period.month)])
-      .then(([summaryData, trendData]) => { setSummary(summaryData); setTrend(trendData); })
-      .catch(() => setError("分析データの取得に失敗しました。もう一度お試しください。"))
-      .finally(() => setLoading(false));
+      .then(([summaryData, trendData]) => { if (isCurrent) { setSummary(summaryData); setTrend(trendData); } })
+      .catch(() => { if (isCurrent) setError("分析データの取得に失敗しました。もう一度お試しください。"); })
+      .finally(() => { if (isCurrent) setLoading(false); });
+    return () => { isCurrent = false; };
   }, [period, router]);
 
   const mom = useMemo(() => {

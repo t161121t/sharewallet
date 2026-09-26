@@ -2,31 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import type { ApiError, DashboardTrend } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { requireAuthUserId } from "@/lib/auth";
-
-function getPeriod(searchParams: URLSearchParams) {
-  const now = new Date();
-  const year = searchParams.get("year") === null ? now.getFullYear() : Number(searchParams.get("year"));
-  const month = searchParams.get("month") === null ? now.getMonth() + 1 : Number(searchParams.get("month"));
-  if (!Number.isInteger(year) || !Number.isInteger(month) || year < 2000 || year > 2100 || month < 1 || month > 12) return null;
-  return { year, month };
-}
+import { formatDashboardDate, getDashboardPeriod, zonedStartOfDay } from "@/lib/dashboardTime";
 
 /** GET /api/dashboard/trend?year=2026&month=9 - 指定月までの6か月推移 */
 export async function GET(req: NextRequest) {
   try {
     const userId = await requireAuthUserId(req);
-    const period = getPeriod(req.nextUrl.searchParams);
+    const period = getDashboardPeriod(req.nextUrl.searchParams);
     if (!period) return NextResponse.json<ApiError>({ error: "year は2000〜2100、month は1〜12で指定してください" }, { status: 400 });
 
-    const from = new Date(period.year, period.month - 6, 1);
-    const to = new Date(period.year, period.month, 1);
+    const firstMonth = new Date(period.year, period.month - 6, 1);
+    const from = zonedStartOfDay(firstMonth.getFullYear(), firstMonth.getMonth() + 1, 1, period.timeZone);
+    const to = period.to;
     const expenses = await prisma.expense.findMany({
       where: { memberId: userId, date: { gte: from, lt: to }, group: { members: { some: { userId } } } },
       select: { amount: true, date: true },
     });
     const totals = new Map<string, number>();
     for (const expense of expenses) {
-      const key = `${expense.date.getFullYear()}-${expense.date.getMonth() + 1}`;
+      const [year, month] = formatDashboardDate(expense.date, period.timeZone).split("-").map(Number);
+      const key = `${year}-${month}`;
       totals.set(key, (totals.get(key) ?? 0) + expense.amount);
     }
     const points = Array.from({ length: 6 }, (_, index) => {

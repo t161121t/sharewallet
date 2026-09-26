@@ -37,15 +37,18 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!isAuthenticated()) { router.replace("/login"); return; }
+    let isCurrent = true;
     setLoading(true); setError(null);
     Promise.all([getDashboardSummary(period.year, period.month), getDashboardCalendar(period.year, period.month)])
       .then(([summaryData, calendarData]) => {
+        if (!isCurrent) return;
         setSummary(summaryData); setCalendar(calendarData);
         setSelectedDate((current) => current && calendarData.days.some((day) => day.date === current)
           ? current : calendarData.days[0]?.date ?? null);
       })
-      .catch(() => setError("支出の取得に失敗しました。もう一度お試しください。"))
-      .finally(() => setLoading(false));
+      .catch(() => { if (isCurrent) setError("支出の取得に失敗しました。もう一度お試しください。"); })
+      .finally(() => { if (isCurrent) setLoading(false); });
+    return () => { isCurrent = false; };
   }, [period, router]);
 
   const daysByDate = useMemo(() => new Map(calendar?.days.map((day) => [day.date, day]) ?? []), [calendar]);
