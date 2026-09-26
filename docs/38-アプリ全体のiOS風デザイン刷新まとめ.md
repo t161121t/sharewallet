@@ -202,28 +202,42 @@ Konstaの`Navbar`は`sticky top-0`で実装されており、Large Titleのス�
 
 ---
 
+## レビューで指摘された点と対応
+
+PR作成後の自動コードレビューで6件の指摘を受け、いずれも修正した。
+
+| 指摘 | 内容 | 対応 |
+| --- | --- | --- |
+| フルページ遷移バグ | `home`/`dashboard`のKonsta `Button`に`href`のみ渡し`component`を指定していなかったため、`Component = 'a'`(素の`&lt;a&gt;`)にフォールバックし、Next.jsのクライアントサイド遷移ではなく毎回フルページリロードになっていた | `component={Link}`を明示的に渡すよう修正(`BottomNav`では既に対応済みだった箇所と統一) |
+| 戻るボタンの挙動変化 | `groups/[groupId]/settings`は元々「← ダッシュボードに戻る」で常に`/dashboard`へ遷移していたが、共通化した`Header`の戻るchevronは`router.back()`のみになっており、直リンクやブラウザ履歴が無い状態で開かれると戻り先が不定になっていた | `Header`に`backHref`propを追加し、指定時はそのパスへ`router.push`する。設定画面には`backHref="/dashboard"`を指定して元の挙動を維持しつつ、他画面は`router.back()`のままにした |
+| タブバーの表示崩れ | 新しい`BottomNav`(Konstaの`Tabbar`)には従来あった`max-w-lg mx-auto`のセンタリングラッパーが無く、`max-w-lg`で中央寄せされた本文に対しタブバーだけがデスクトップ幅で画面全幅に伸びてしまっていた | `Tabbar`の`innerClassName`に`max-w-lg mx-auto w-full`を指定し、本文と同じ幅・中央寄せに揃えた |
+| ダークモードのちらつき(FOUC) | `ThemeSync`は`useEffect`(マウント後)で`.dark`クラスを付与していたため、OSがダークモードの端末では初回描画時に一瞬ライトテーマが表示されてから切り替わっていた | ルートレイアウトの`&lt;head&gt;`に、初回ペイント前に同期的に`.dark`クラスを付与するインラインスクリプトを追加。以降のOS設定変更の追従は引き続き`ThemeSync`が担う |
+| 未使用コンポーネント | 新規追加した`ListRow`がどこからも使われていなかった(グループ設定画面では直接Konstaの`ListItem`を使っていた) | `groups/[groupId]/settings/page.tsx`の招待リンク一覧・メンバー一覧を`ListRow`経由に置き換え、実際に使われる状態にした。`ListRow`に`titleWrapClassName`/`innerClassName`のパススルーを追加し、既存の表示(URLのtruncate・縦位置調整)を崩さずに置き換えられるようにした |
+
+---
+
 ## 変更ファイル一覧
 
 | ファイル | 変更内容 |
 | --- | --- |
 | `package.json` / `package-lock.json` | `konsta`・`lucide-react`を追加 |
 | `src/app/globals.css` | Konstaテーマの読み込み、ブランドカラー・角丸・セパレーターの上書き |
-| `src/app/layout.tsx` | `KonstaProvider`・`ThemeSync`の組み込み |
+| `src/app/layout.tsx` | `KonstaProvider`・`ThemeSync`の組み込み、FOUC防止のダークモード同期スクリプト追加 |
 | `src/components/layout/KonstaProvider.tsx` | 新規。Konsta `<App>`のClient Componentラッパー |
 | `src/components/layout/ThemeSync.tsx` | 新規。OSのダークモード設定を`.dark`クラスに同期 |
-| `src/components/layout/Header.tsx` | Konstaの`Navbar`ベースに全面書き換え |
-| `src/components/layout/BottomNav.tsx` | Konstaの`Tabbar`ベースに全面書き換え |
+| `src/components/layout/Header.tsx` | Konstaの`Navbar`ベースに全面書き換え、`backHref`propを追加 |
+| `src/components/layout/BottomNav.tsx` | Konstaの`Tabbar`ベースに全面書き換え、`innerClassName`で本文幅とセンタリングを揃える |
 | `src/components/layout/ScreenContainer.tsx` | `header`スロット追加、スクロールコンテナ化 |
 | `src/components/ui/PrimaryButton.tsx` | Konstaの`Button`ベースに刷新(外部API互換) |
 | `src/components/ui/TextInput.tsx` | 塗りつぶしスタイルに刷新(外部API互換) |
 | `src/components/ui/Card.tsx` | 新規。Konstaの`Card`ラッパー |
-| `src/components/ui/ListRow.tsx` | 新規。Konstaの`ListItem`ラッパー |
-| `src/app/home/page.tsx` | CTAボタンをKonsta `Button`に |
-| `src/app/dashboard/page.tsx` | `Header`追加、`Segmented`導入、トークン化 |
+| `src/components/ui/ListRow.tsx` | 新規。Konstaの`ListItem`ラッパー(`titleWrapClassName`/`innerClassName`パススルー対応) |
+| `src/app/home/page.tsx` | CTAボタンをKonsta `Button`に(`component={Link}`でクライアント遷移に対応) |
+| `src/app/dashboard/page.tsx` | `Header`追加、`Segmented`導入、トークン化、グループ作成ボタンのクライアント遷移対応 |
 | `src/app/expense/page.tsx` | `Header`追加、フォーム類を塗りつぶしスタイルに統一 |
 | `src/app/expense/history/page.tsx` | `Header`追加、編集モーダルを`Sheet`化 |
 | `src/app/groups/new/page.tsx` | `Header`追加、`Card`/`Button`導入 |
-| `src/app/groups/[groupId]/settings/page.tsx` | `Header`追加、`Card`/`List`/`ListItem`導入 |
+| `src/app/groups/[groupId]/settings/page.tsx` | `Header showBackButton backHref="/dashboard"`追加、`Card`/`List`/`ListRow`導入 |
 | `src/app/groups/[groupId]/settlement/page.tsx` | `Header`追加、トークン化 |
 | `src/app/profile/page.tsx` | `Header`追加、`Card`導入、ログアウトボタン刷新 |
 
