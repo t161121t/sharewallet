@@ -10,6 +10,10 @@ type ListRowProps = {
   onClick?: () => void;
   chevron?: boolean;
   className?: string;
+  /** タイトル部分の折り返し・truncate調整用(長いURLなどを`truncate`させたい場合) */
+  titleWrapClassName?: string;
+  /** 行内部コンテナのクラス(縦位置の調整など) */
+  innerClassName?: string;
 };
 
 /** iOSのGrouped List行(アイコン+ラベル+chevron)。`<List>`の子として使う */
@@ -22,6 +26,8 @@ export default function ListRow({
   onClick,
   chevron,
   className = "",
+  titleWrapClassName,
+  innerClassName,
 }: ListRowProps) {
   return (
     <ListItem
@@ -34,6 +40,8 @@ export default function ListRow({
       onClick={onClick}
       chevron={chevron ?? Boolean(href || onClick)}
       className={className}
+      titleWrapClassName={titleWrapClassName}
+      innerClassName={innerClassName}
     />
   );
 }

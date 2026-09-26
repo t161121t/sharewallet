@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { Button, List, ListItem } from "konsta/react";
+import { Button, List } from "konsta/react";
 import ScreenContainer from "@/components/layout/ScreenContainer";
 import PageTransition from "@/components/layout/PageTransition";
 import Header from "@/components/layout/Header";
@@ -14,6 +14,7 @@ import PrimaryButton from "@/components/ui/PrimaryButton";
 import ColorPalette from "@/components/ui/ColorPalette";
 import GroupAvatar from "@/components/ui/GroupAvatar";
 import Card from "@/components/ui/Card";
+import ListRow from "@/components/ui/ListRow";
 import type { Group, GroupInvitation } from "@/types";
 import {
   ApiClientError,
@@ -176,7 +177,7 @@ export default function GroupSettingsPage() {
   if (!group) return <RouteLoading text="グループ設定を読み込み中..." withBottomNav />;
 
   return (
-    <ScreenContainer header={<Header title="グループ設定" showBackButton />}>
+    <ScreenContainer header={<Header title="グループ設定" showBackButton backHref="/dashboard" />}>
       <PageTransition className="flex flex-col w-full gap-5 pb-20">
         <TextInput label="グループ名" value={name} onChange={setName} />
         <Card contentWrapPadding="p-4">
@@ -243,7 +244,7 @@ export default function GroupSettingsPage() {
                 </p>
                 <List strongIos insetIos className="my-0">
                   {invitations.map((inv) => (
-                    <ListItem
+                    <ListRow
                       key={inv.id}
                       title={inv.url}
                       titleWrapClassName="min-w-0"
@@ -300,7 +301,7 @@ export default function GroupSettingsPage() {
           </h2>
           <List strongIos insetIos className="my-0">
             {group.members.map((m) => (
-              <ListItem
+              <ListRow
                 key={m.id}
                 title={`${m.name}${m.role ? `（${m.role}）` : ""}`}
                 after={

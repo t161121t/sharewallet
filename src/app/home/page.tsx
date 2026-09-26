@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Button } from "konsta/react";
 import ScreenContainer from "@/components/layout/ScreenContainer";
 import PageTransition from "@/components/layout/PageTransition";
@@ -15,10 +16,11 @@ export default function HomePage() {
         </div>
 
         <div className="flex flex-col gap-5 w-full pb-4">
-          <Button large rounded href="/login" className="h-14 text-lg" aria-label="ログイン画面へ">
+          <Button component={Link} large rounded href="/login" className="h-14 text-lg" aria-label="ログイン画面へ">
             ログイン
           </Button>
           <Button
+            component={Link}
             large
             rounded
             tonal

@@ -71,7 +71,12 @@ export default function BottomNav() {
   );
 
   return (
-    <Tabbar labels icons className="fixed bottom-0 left-0 right-0 z-50">
+    <Tabbar
+      labels
+      icons
+      className="fixed bottom-0 left-0 right-0 z-50"
+      innerClassName="max-w-lg mx-auto w-full"
+    >
       {STATIC_ITEMS.map((item) => {
         const active = pathname === item.href;
         return (

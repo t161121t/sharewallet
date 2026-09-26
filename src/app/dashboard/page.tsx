@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button, Segmented, SegmentedButton } from "konsta/react";
 import ScreenContainer from "@/components/layout/ScreenContainer";
 import PageTransition from "@/components/layout/PageTransition";
@@ -452,7 +453,7 @@ export default function DashboardPage() {
 
         {activeTab !== "categories" && (
           <div className="w-full mb-4">
-            <Button rounded href="/groups/new" inline className="px-4">
+            <Button component={Link} rounded href="/groups/new" inline className="px-4">
               + グループ作成
             </Button>
           </div>
