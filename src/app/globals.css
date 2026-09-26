@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "konsta/react/theme.css";
 
 :root {
   --background: #faf8f5;
@@ -21,6 +22,17 @@
   --radius-sm: 0.5rem;
   --radius-md: 1rem;
   --radius-full: 9999px;
+  /* iOSのカード・シート角丸(Konstaの大きめカード相当) */
+  --radius-card: 1.25rem;
+
+  /* iOSのhairlineセパレーター色 */
+  --color-separator: rgba(60, 60, 67, 0.29);
+}
+
+/* Konstaのブランドカラーをゴールドに差し替える。ここから ios-primary / md-light-primary
+   等の派生色がすべて自動生成される(node_modules/konsta/plugin-colors.js参照) */
+@theme {
+  --color-brand-primary: #c9a227;
 }
 
 @theme inline {
@@ -39,8 +51,14 @@
     --color-surface-dim: #262522;
     --color-text-primary: #eae7e1;
     --color-text-secondary: #9e9a93;
+    --color-separator: rgba(84, 84, 88, 0.65);
   }
 }
+
+/* Konsta UIは `dark:` をprefers-color-schemeではなく.darkクラスの有無で判定するため
+   (node_modules/konsta/styles/base.css)、既存コンポーネントのdark:クラスもKonstaの
+   コンポーネントも同じ基準で切り替わるよう、.darkクラスをOS設定に同期させる
+   (ThemeSyncコンポーネント、src/components/layout/ThemeSync.tsx参照) */
 
 body {
   background: var(--background);

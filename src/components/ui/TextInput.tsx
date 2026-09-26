@@ -24,15 +24,13 @@ export default function TextInput({
       </div>
       <input
         className={[
-          "w-full h-12 rounded-xl px-4 outline-none text-base",
-          "bg-white dark:bg-[#1c1b19] border border-[#e5e0d8] dark:border-[#333230]",
+          "w-full h-12 rounded-xl px-4 outline-none text-base border-none",
+          "bg-black/[0.04] dark:bg-white/10",
           "text-[#2d2a26] dark:text-[#eae7e1]",
           "placeholder:text-[#b5b0a8] dark:placeholder:text-[#666360]",
           "transition-all duration-200 ease-out",
           disabled ? "opacity-60 cursor-not-allowed" : "",
-          error
-            ? "ring-2 ring-red-400 focus:ring-red-500"
-            : "focus:ring-2 focus:ring-[#c9a227] focus:border-[#c9a227]",
+          error ? "ring-2 ring-red-400 focus:ring-red-500" : "focus:ring-2 focus:ring-primary",
         ].join(" ")}
         type={type}
         placeholder={placeholder}

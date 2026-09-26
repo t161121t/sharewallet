@@ -4,12 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
+import { Button, Sheet } from "konsta/react";
 import ScreenContainer from "@/components/layout/ScreenContainer";
 import PageTransition from "@/components/layout/PageTransition";
+import Header from "@/components/layout/Header";
 import BottomNav from "@/components/layout/BottomNav";
 import RouteLoading from "@/components/layout/RouteLoading";
 import CategoryIcon from "@/components/icons/CategoryIcon";
 import GroupAvatar from "@/components/ui/GroupAvatar";
+import TextInput from "@/components/ui/TextInput";
+import PrimaryButton from "@/components/ui/PrimaryButton";
 import type { Group, ExpenseRecord, CategoryName } from "@/types";
 import {
   isAuthenticated,
@@ -289,15 +293,8 @@ export default function HistoryPage() {
   };
 
   return (
-    <ScreenContainer>
+    <ScreenContainer header={<Header title="詳細" large />}>
       <PageTransition className="flex flex-col w-full flex-1 pb-20">
-        <p
-          className="text-4xl text-[#2d2a26] dark:text-[#eae7e1] pb-4 text-center"
-          style={{ fontFamily: "var(--font-dancing-script), cursive" }}
-        >
-          Share Wallet
-        </p>
-
         <div className="flex items-center gap-2 mb-4">
           <GroupAvatar name={group.name} color={group.color} iconUrl={group.iconUrl} size={32} className="rounded-full" />
           <span className="text-lg font-bold text-[#2d2a26] dark:text-[#eae7e1]">
@@ -307,13 +304,14 @@ export default function HistoryPage() {
 
         <SummaryCard expenses={expenses} group={group} />
 
-        <button
-          type="button"
+        <Button
+          outline
+          rounded
+          className="w-full mt-3 h-11 text-sm"
           onClick={() => router.push(`/groups/${groupId}/settlement`)}
-          className="w-full mt-3 h-11 rounded-xl border border-[#c9a227] text-[#c9a227] font-semibold text-sm"
         >
           精算を確認 →
-        </button>
+        </Button>
 
         <h2 className="text-lg font-bold text-[#2d2a26] dark:text-[#eae7e1] mt-6 mb-2">
           支出履歴
@@ -327,7 +325,7 @@ export default function HistoryPage() {
                   {formatDate(items[0].date)}
                 </span>
               </div>
-              <div className="divide-y divide-[#f0ece6] dark:divide-[#262522]">
+              <div className="divide-y divide-[var(--color-separator)]">
                 {items.map((expense) => (
                   // OWNER/ADMIN は全件、自分の支出は本人が編集可能
                   // それ以外は編集ボタンを表示しない
@@ -345,42 +343,21 @@ export default function HistoryPage() {
             </div>
           ))}
         </div>
-        {editing && (
-          <div className="fixed inset-0 bg-black/40 z-50 flex items-end">
-            <div className="w-full bg-white dark:bg-[#1c1b19] rounded-t-2xl p-5">
-              <h3 className="text-lg font-bold mb-3">支出を編集</h3>
-              <label className="block mb-2 text-sm">メモ</label>
-              <input
-                value={editMemo}
-                onChange={(e) => setEditMemo(e.target.value)}
-                className="w-full h-10 rounded-lg px-3 border border-[#e5e0d8] dark:border-[#333230] mb-3"
-              />
-              <label className="block mb-2 text-sm">金額</label>
-              <input
-                type="number"
-                value={editAmount}
-                onChange={(e) => setEditAmount(e.target.value)}
-                className="w-full h-10 rounded-lg px-3 border border-[#e5e0d8] dark:border-[#333230] mb-4"
-              />
-              <button
-                type="button"
-                onClick={saveEdit}
-                className="w-full h-11 rounded-lg bg-[#c9a227] text-white font-semibold mb-2"
-              >
-                変更を保存
-              </button>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditing(null)}
-                  className="flex-1 h-10 rounded-lg border border-[#e5e0d8]"
-                >
-                  キャンセル
-                </button>
-              </div>
-            </div>
+        <Sheet
+          opened={!!editing}
+          onBackdropClick={() => setEditing(null)}
+          className="rounded-t-[var(--radius-card)] pb-[env(safe-area-inset-bottom)]"
+        >
+          <div className="p-5 flex flex-col gap-4">
+            <h3 className="text-lg font-bold text-[#2d2a26] dark:text-[#eae7e1]">支出を編集</h3>
+            <TextInput label="メモ" value={editMemo} onChange={setEditMemo} />
+            <TextInput label="金額" type="number" value={editAmount} onChange={setEditAmount} />
+            <PrimaryButton onClick={saveEdit}>変更を保存</PrimaryButton>
+            <Button clear rounded onClick={() => setEditing(null)}>
+              キャンセル
+            </Button>
           </div>
-        )}
+        </Sheet>
       </PageTransition>
 
       <BottomNav />

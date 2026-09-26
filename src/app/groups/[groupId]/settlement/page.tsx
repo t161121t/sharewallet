@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import ScreenContainer from "@/components/layout/ScreenContainer";
 import PageTransition from "@/components/layout/PageTransition";
+import Header from "@/components/layout/Header";
 import BottomNav from "@/components/layout/BottomNav";
 import RouteLoading from "@/components/layout/RouteLoading";
 import GroupAvatar from "@/components/ui/GroupAvatar";
@@ -70,15 +71,8 @@ export default function SettlementPage() {
   }
 
   return (
-    <ScreenContainer>
+    <ScreenContainer header={<Header title="精算" showBackButton />}>
       <PageTransition className="flex flex-col w-full flex-1 pb-20">
-        <p
-          className="text-4xl text-[#2d2a26] dark:text-[#eae7e1] pb-4 text-center"
-          style={{ fontFamily: "var(--font-dancing-script), cursive" }}
-        >
-          Share Wallet
-        </p>
-
         <div className="flex items-center gap-2 mb-4">
           <GroupAvatar name={group.name} color={group.color} iconUrl={group.iconUrl} size={32} className="rounded-full" />
           <span className="text-lg font-bold text-[#2d2a26] dark:text-[#eae7e1]">
@@ -129,7 +123,7 @@ export default function SettlementPage() {
             {settlement.transactions.map((tx, idx) => (
               <div
                 key={idx}
-                className="flex items-center gap-3 p-4 rounded-2xl bg-white dark:bg-[#1c1b19] shadow-sm border border-[#f0ece6] dark:border-[#262522]"
+                className="flex items-center gap-3 p-4 rounded-[var(--radius-card)] bg-white dark:bg-[#1c1b19] shadow-sm border border-[var(--color-separator)]"
               >
                 <UserAvatar name={tx.fromUserName} color={tx.fromUserColor} avatarUrl={tx.fromUserAvatarUrl} size={40} />
                 <div className="flex-1 min-w-0">
@@ -167,7 +161,7 @@ export default function SettlementPage() {
           {settlement.memberBalances.map((mb) => (
             <div
               key={mb.userId}
-              className="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-[#1c1b19] border border-[#f0ece6] dark:border-[#262522]"
+              className="flex items-center gap-3 p-3 rounded-[var(--radius-card)] bg-white dark:bg-[#1c1b19] border border-[var(--color-separator)]"
             >
               <UserAvatar name={mb.userName} color={mb.userColor} avatarUrl={mb.userAvatarUrl} size={36} />
               <span className="flex-1 text-sm font-medium text-[#2d2a26] dark:text-[#eae7e1] truncate">

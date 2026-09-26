@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Dancing_Script } from "next/font/google";
 import { Toaster } from "react-hot-toast";
+import ThemeSync from "@/components/layout/ThemeSync";
+import KonstaProvider from "@/components/layout/KonstaProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -30,10 +32,22 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
+      <head>
+        {/* Konsta UIのdark:バリアントは.darkクラスの有無で切り替わるため、初回ペイント前に
+            同期的に.darkクラスを付与する(ThemeSyncのuseEffectを待つとダークモード端末で
+            一瞬ライトテーマがちらつくため)。以降のOS設定変更の追従はThemeSyncが担う。 */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(window.matchMedia('(prefers-color-scheme: dark)').matches){document.documentElement.classList.add('dark')}}catch(e){}",
+          }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${dancingScript.variable} antialiased`}
       >
-        {children}
+        <ThemeSync />
+        <KonstaProvider>{children}</KonstaProvider>
         <Toaster
           position="top-center"
           toastOptions={{

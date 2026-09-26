@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import BottomNav from "@/components/layout/BottomNav";
+import Header from "@/components/layout/Header";
 import PageTransition from "@/components/layout/PageTransition";
 import RouteLoading from "@/components/layout/RouteLoading";
 import ScreenContainer from "@/components/layout/ScreenContainer";
@@ -59,17 +60,8 @@ export default function DashboardPage() {
 
   if (loading && !calendar) return <RouteLoading text="カレンダーを読み込み中..." withBottomNav />;
   return (
-    <ScreenContainer>
+    <ScreenContainer header={<Header title="ホーム" large />}>
       <PageTransition className="w-full flex-1 pb-28">
-        <header className="pt-1 pb-6">
-          <p
-            className="pb-3 text-4xl text-[#2d2a26] dark:text-[#eae7e1]"
-            style={{ fontFamily: "var(--font-dancing-script), cursive" }}
-          >
-            Share Wallet
-          </p>
-          <p className="mt-1 text-sm text-[#7a756d] dark:text-[#9e9a93]">今日の支出を、あとから思い出せる。</p>
-        </header>
         <section className="mb-5 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-[#2d2a26] dark:text-[#eae7e1]">{monthLabel(period.year, period.month)}</h1>
@@ -81,23 +73,23 @@ export default function DashboardPage() {
             <button aria-label="次の月" type="button" onClick={() => setPeriod((current) => shiftMonth(current.year, current.month, 1))} className="grid h-10 w-10 place-items-center rounded-full text-2xl text-[#7a756d] hover:bg-[#f0ece6] dark:hover:bg-[#2b2926]">›</button>
           </div>
         </section>
-        {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : <>
-          <section className="rounded-3xl border border-[#ece7de] bg-white p-4 shadow-sm dark:border-[#2f2d2a] dark:bg-[#1c1b19]">
+        {error ? <div className="rounded-[var(--radius-card)] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : <>
+          <section className="rounded-[var(--radius-card)] border border-[var(--color-separator)] bg-white p-4 shadow-sm dark:bg-[#1c1b19]">
             <div className="mb-4 flex items-center justify-between"><h2 className="font-bold text-[#2d2a26] dark:text-[#eae7e1]">{period.month}月の記録</h2><span className="text-xs text-[#7a756d] dark:text-[#9e9a93]">{calendar?.days.reduce((sum, day) => sum + day.expenseCount, 0) ?? 0}件</span></div>
             <div className="grid grid-cols-7 text-center text-xs font-semibold text-[#7a756d] dark:text-[#9e9a93]">{WEEKDAYS.map((weekday, index) => <span key={weekday} className={index === 0 ? "text-red-500" : index === 6 ? "text-[#c9a227]" : ""}>{weekday}</span>)}</div>
             <div className="mt-2 grid grid-cols-7 gap-y-1">{calendarCells.map((day, index) => {
               if (!day) return <div key={`empty-${index}`} className="h-12" />;
               const date = toDateKey(period.year, period.month, day); const record = daysByDate.get(date); const isSelected = selectedDate === date; const weekday = (firstWeekday + day - 1) % 7;
               return <button key={date} type="button" onClick={() => setSelectedDate(date)} className="flex h-12 flex-col items-center justify-center rounded-2xl transition-colors hover:bg-[#f6f2ea] dark:hover:bg-[#2b2926]" aria-pressed={isSelected}>
-                <span className={["grid h-8 w-8 place-items-center rounded-full text-sm font-semibold", isSelected ? "bg-[#c9a227] text-white" : weekday === 0 ? "text-red-500" : weekday === 6 ? "text-[#c9a227]" : "text-[#2d2a26] dark:text-[#eae7e1]"].join(" ")}>{day}</span><span className={["mt-0.5 h-1.5 w-1.5 rounded-full", record ? "bg-[#c9a227]" : "bg-transparent"].join(" ")} />
+                <span className={["grid h-8 w-8 place-items-center rounded-full text-sm font-semibold", isSelected ? "bg-primary text-white" : weekday === 0 ? "text-red-500" : weekday === 6 ? "text-[#c9a227]" : "text-[#2d2a26] dark:text-[#eae7e1]"].join(" ")}>{day}</span><span className={["mt-0.5 h-1.5 w-1.5 rounded-full", record ? "bg-primary" : "bg-transparent"].join(" ")} />
               </button>;
             })}</div>
           </section>
-          <section className="mt-4 rounded-3xl border border-[#ece7de] bg-white p-4 shadow-sm dark:border-[#2f2d2a] dark:bg-[#1c1b19]">
+          <section className="mt-4 rounded-[var(--radius-card)] border border-[var(--color-separator)] bg-white p-4 shadow-sm dark:bg-[#1c1b19]">
             {selectedDay ? <>
-              <div className="flex items-start justify-between gap-3 border-b border-[#f0ece6] pb-3 dark:border-[#2f2d2a]"><div><h2 className="font-bold text-[#2d2a26] dark:text-[#eae7e1]">{period.month}月{Number(selectedDay.date.slice(-2))}日の明細</h2><p className="mt-0.5 text-xs text-[#7a756d] dark:text-[#9e9a93]">{selectedDay.expenseCount}件の支出</p></div><p className="text-lg font-extrabold tabular-nums text-[#2d2a26] dark:text-[#eae7e1]">{formatYen(selectedDay.totalPersonalAmount)}</p></div>
-              <div className="divide-y divide-[#f0ece6] dark:divide-[#2f2d2a]">{selectedDay.expenses.map((expense) => <div key={expense.id} className="flex items-center gap-3 py-3"><span className="grid h-9 w-9 place-items-center rounded-xl" style={{ backgroundColor: `${CATEGORY_COLORS[expense.category]}20`, color: CATEGORY_COLORS[expense.category] }}><CategoryIcon category={expense.category} size={19} /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-[#2d2a26] dark:text-[#eae7e1]">{expense.memo || expense.category}</p><p className="truncate text-xs text-[#7a756d] dark:text-[#9e9a93]">{expense.groupName}</p></div><p className="font-bold tabular-nums text-[#2d2a26] dark:text-[#eae7e1]">{formatYen(expense.amount)}</p></div>)}</div>
-              <Link href="/expense/history" className="mt-2 block text-right text-sm font-bold text-[#c9a227]">すべての明細を見る ›</Link>
+              <div className="flex items-start justify-between gap-3 border-b border-[var(--color-separator)] pb-3"><div><h2 className="font-bold text-[#2d2a26] dark:text-[#eae7e1]">{period.month}月{Number(selectedDay.date.slice(-2))}日の明細</h2><p className="mt-0.5 text-xs text-[#7a756d] dark:text-[#9e9a93]">{selectedDay.expenseCount}件の支出</p></div><p className="text-lg font-extrabold tabular-nums text-[#2d2a26] dark:text-[#eae7e1]">{formatYen(selectedDay.totalPersonalAmount)}</p></div>
+              <div className="divide-y divide-[var(--color-separator)]">{selectedDay.expenses.map((expense) => <div key={expense.id} className="flex items-center gap-3 py-3"><span className="grid h-9 w-9 place-items-center rounded-xl" style={{ backgroundColor: `${CATEGORY_COLORS[expense.category]}20`, color: CATEGORY_COLORS[expense.category] }}><CategoryIcon category={expense.category} size={19} /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-[#2d2a26] dark:text-[#eae7e1]">{expense.memo || expense.category}</p><p className="truncate text-xs text-[#7a756d] dark:text-[#9e9a93]">{expense.groupName}</p></div><p className="font-bold tabular-nums text-[#2d2a26] dark:text-[#eae7e1]">{formatYen(expense.amount)}</p></div>)}</div>
+              <Link href="/expense/history" className="mt-2 block text-right text-sm font-bold text-primary">すべての明細を見る ›</Link>
             </> : <div className="py-5 text-center"><p className="font-semibold text-[#2d2a26] dark:text-[#eae7e1]">この日の支出はありません</p><p className="mt-1 text-sm text-[#7a756d] dark:text-[#9e9a93]">別の日を選ぶか、支出を入力してください。</p></div>}
           </section>
         </>}
