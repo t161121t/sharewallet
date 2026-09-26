@@ -335,6 +335,8 @@ export async function createExpense(
     memberId?: string;
     memberName?: string;
     memo?: string;
+    /** YYYY-MM-DD。省略時は登録時刻を使う */
+    date?: string;
     shares?: ExpenseShare[];
   }
 ): Promise<ExpenseRecord> {

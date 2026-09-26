@@ -52,6 +52,11 @@ function normalizeCategory(category: string): CategoryName {
   return "その他";
 }
 
+function todayForInput() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
 /** Canvas で画像を最大 1024px・JPEG 0.8 品質にリサイズして base64 を返す */
 function compressImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -90,6 +95,7 @@ export default function ExpensePage() {
   const [genre, setGenre] = useState("");
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
+  const [expenseDate, setExpenseDate] = useState(todayForInput);
   const [isReady, setIsReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -222,6 +228,7 @@ export default function ExpensePage() {
         category: normalizeCategory(genre),
         amount: Number(amount),
         memo: memo || undefined,
+        date: expenseDate,
         shares: shareItems,
       });
       setExpenses((prev) => [created, ...prev]);
@@ -400,6 +407,25 @@ export default function ExpensePage() {
                 "focus:ring-2 focus:ring-[#c9a227] focus:border-[#c9a227]",
               ].join(" ")}
               aria-label="使った金額を入力"
+            />
+          </label>
+
+          <label className="w-full">
+            <div className="text-base font-medium text-[#4a4540] dark:text-[#c5c0b8] mb-2">
+              使った日
+            </div>
+            <input
+              type="date"
+              value={expenseDate}
+              onChange={(e) => setExpenseDate(e.target.value)}
+              className={[
+                "w-full h-13 rounded-xl px-4 outline-none text-base",
+                "bg-white dark:bg-[#1c1b19] border border-[#e5e0d8] dark:border-[#333230]",
+                "text-[#2d2a26] dark:text-[#eae7e1]",
+                "transition-all duration-200 ease-out",
+                "focus:ring-2 focus:ring-[#c9a227] focus:border-[#c9a227]",
+              ].join(" ")}
+              aria-label="使った日を選択"
             />
           </label>
 
