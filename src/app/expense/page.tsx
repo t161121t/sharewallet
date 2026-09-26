@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import ScreenContainer from "@/components/layout/ScreenContainer";
 import PageTransition from "@/components/layout/PageTransition";
+import Header from "@/components/layout/Header";
 import BottomNav from "@/components/layout/BottomNav";
 import RouteLoading from "@/components/layout/RouteLoading";
 import GroupBanner from "@/components/ui/GroupBanner";
@@ -246,12 +247,9 @@ export default function ExpensePage() {
   }
   if (!group) {
     return (
-      <ScreenContainer>
+      <ScreenContainer header={<Header title="入力" large />}>
         <PageTransition className="flex flex-col items-center w-full flex-1 pb-20">
-          <p className="text-4xl text-[#2d2a26] dark:text-[#eae7e1] pb-3" style={{ fontFamily: "var(--font-dancing-script), cursive" }}>
-            Share Wallet
-          </p>
-          <div className="w-full rounded-2xl border border-dashed border-[#ddd6c8] dark:border-[#3c3a36] px-5 py-10 text-center">
+          <div className="w-full rounded-[var(--radius-card)] border border-dashed border-[var(--color-separator)] px-5 py-10 text-center">
             <p className="text-4xl mb-3">👥</p>
             <p className="text-sm font-medium text-[#8c867d] dark:text-[#8f8a84]">まだグループがありません</p>
             <p className="text-xs text-[#b5b0a8] dark:text-[#5c5955] mt-1">先にグループを作成してください</p>
@@ -265,16 +263,8 @@ export default function ExpensePage() {
   const isFormDisabled = analyzing || loading;
 
   return (
-    <ScreenContainer>
+    <ScreenContainer header={<Header title="入力" large />}>
       <PageTransition className="flex flex-col items-center w-full flex-1 pb-20">
-        {/* アプリ名 */}
-        <p
-          className="text-4xl text-[#2d2a26] dark:text-[#eae7e1] pb-3"
-          style={{ fontFamily: "var(--font-dancing-script), cursive" }}
-        >
-          Share Wallet
-        </p>
-
         {/* グループバナー */}
         <div className="w-full">
           <GroupBanner group={group} />
@@ -290,9 +280,9 @@ export default function ExpensePage() {
             disabled={isFormDisabled}
             className={[
               "w-full h-11 rounded-xl px-3 outline-none appearance-none cursor-pointer text-sm",
-              "bg-white dark:bg-[#1c1b19] border border-[#e5e0d8] dark:border-[#333230]",
+              "bg-black/[0.04] dark:bg-white/10",
               "text-[#2d2a26] dark:text-[#eae7e1]",
-              "focus:ring-2 focus:ring-[#c9a227] focus:border-[#c9a227]",
+              "focus:ring-2 focus:ring-primary",
               "disabled:opacity-50",
             ].join(" ")}
           >
@@ -305,11 +295,8 @@ export default function ExpensePage() {
           )}
         </label>
 
-        {/* ページタイトル + レシートボタン */}
-        <div className="flex items-center justify-between w-full mt-5">
-          <h1 className="text-xl font-bold text-[#2d2a26] dark:text-[#eae7e1]">
-            共有金額入力
-          </h1>
+        {/* レシートボタン */}
+        <div className="flex items-center justify-end w-full mt-5">
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -356,7 +343,7 @@ export default function ExpensePage() {
             <img
               src={receiptPreview}
               alt="レシートプレビュー"
-              className="w-full max-h-40 object-contain rounded-xl border border-[#e5e0d8] dark:border-[#333230]"
+              className="w-full max-h-40 object-contain rounded-xl border border-[var(--color-separator)]"
             />
             <button
               type="button"
@@ -393,11 +380,11 @@ export default function ExpensePage() {
               }}
               className={[
                 "w-full h-13 rounded-xl px-4 outline-none text-base",
-                "bg-white dark:bg-[#1c1b19] border border-[#e5e0d8] dark:border-[#333230]",
+                "bg-black/[0.04] dark:bg-white/10",
                 "text-[#2d2a26] dark:text-[#eae7e1]",
                 "placeholder:text-[#b5b0a8] dark:placeholder:text-[#666360]",
                 "transition-all duration-200 ease-out",
-                "focus:ring-2 focus:ring-[#c9a227] focus:border-[#c9a227]",
+                "focus:ring-2 focus:ring-primary",
               ].join(" ")}
               aria-label="使った金額を入力"
             />
@@ -414,11 +401,11 @@ export default function ExpensePage() {
               onChange={(e) => setMemo(e.target.value)}
               className={[
                 "w-full h-13 rounded-xl px-4 outline-none text-base",
-                "bg-white dark:bg-[#1c1b19] border border-[#e5e0d8] dark:border-[#333230]",
+                "bg-black/[0.04] dark:bg-white/10",
                 "text-[#2d2a26] dark:text-[#eae7e1]",
                 "placeholder:text-[#b5b0a8] dark:placeholder:text-[#666360]",
                 "transition-all duration-200 ease-out",
-                "focus:ring-2 focus:ring-[#c9a227] focus:border-[#c9a227]",
+                "focus:ring-2 focus:ring-primary",
               ].join(" ")}
               aria-label="メモを入力"
             />
@@ -437,7 +424,7 @@ export default function ExpensePage() {
             );
             const isValid = total === 100;
             return (
-              <div className="rounded-xl p-4 border border-[#e5e0d8] dark:border-[#333230]">
+              <div className="rounded-xl p-4 border border-[var(--color-separator)]">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm font-semibold text-[#2d2a26] dark:text-[#eae7e1]">
                     負担比率（10%単位）

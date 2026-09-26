@@ -1,19 +1,10 @@
 "use client";
 
-import Link from "next/link";
+import { Button } from "konsta/react";
 import ScreenContainer from "@/components/layout/ScreenContainer";
 import PageTransition from "@/components/layout/PageTransition";
 import Logo from "@/components/ui/Logo";
 import CoinIcon from "@/components/ui/CoinIcon";
-
-const buttonClassName = [
-  "w-full h-14 rounded-full font-semibold text-lg text-white",
-  "shadow-md hover:shadow-lg",
-  "transition-all duration-150 ease-out",
-  "hover:brightness-105 active:scale-[0.97] active:shadow-inner",
-  "flex items-center justify-center",
-  "relative overflow-hidden",
-].join(" ");
 
 export default function HomePage() {
   return (
@@ -24,26 +15,19 @@ export default function HomePage() {
         </div>
 
         <div className="flex flex-col gap-5 w-full pb-4">
-          <Link
-            href="/login"
-            className={buttonClassName}
-            style={{
-              background: "linear-gradient(135deg, #d4a320 0%, #e8c547 50%, #c9a227 100%)",
-            }}
-            aria-label="ログイン画面へ"
-          >
+          <Button large rounded href="/login" className="h-14 text-lg" aria-label="ログイン画面へ">
             ログイン
-          </Link>
-          <Link
+          </Button>
+          <Button
+            large
+            rounded
+            tonal
             href="/register"
-            className={buttonClassName}
-            style={{
-              background: "linear-gradient(135deg, #d4a320 0%, #e8c547 50%, #c9a227 100%)",
-            }}
+            className="h-14 text-lg"
             aria-label="新規登録画面へ"
           >
             新規登録
-          </Link>
+          </Button>
         </div>
 
         <footer className="py-4 flex justify-center">

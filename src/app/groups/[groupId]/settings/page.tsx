@@ -3,14 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { Button, List, ListItem } from "konsta/react";
 import ScreenContainer from "@/components/layout/ScreenContainer";
 import PageTransition from "@/components/layout/PageTransition";
+import Header from "@/components/layout/Header";
 import BottomNav from "@/components/layout/BottomNav";
 import RouteLoading from "@/components/layout/RouteLoading";
 import TextInput from "@/components/ui/TextInput";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import ColorPalette from "@/components/ui/ColorPalette";
 import GroupAvatar from "@/components/ui/GroupAvatar";
+import Card from "@/components/ui/Card";
 import type { Group, GroupInvitation } from "@/types";
 import {
   ApiClientError,
@@ -173,55 +176,42 @@ export default function GroupSettingsPage() {
   if (!group) return <RouteLoading text="グループ設定を読み込み中..." withBottomNav />;
 
   return (
-    <ScreenContainer>
+    <ScreenContainer header={<Header title="グループ設定" showBackButton />}>
       <PageTransition className="flex flex-col w-full gap-5 pb-20">
-        <button
-          type="button"
-          onClick={() => router.push("/dashboard")}
-          className="self-start text-sm text-[#7a756d] dark:text-[#9e9a93] underline"
-        >
-          ← ダッシュボードに戻る
-        </button>
-        <h1 className="text-2xl font-bold text-[#2d2a26] dark:text-[#eae7e1]">
-          グループ設定
-        </h1>
         <TextInput label="グループ名" value={name} onChange={setName} />
-        <div className="rounded-xl border border-[#e5e0d8] dark:border-[#333230] p-4">
+        <Card contentWrapPadding="p-4">
           <p className="text-base font-medium text-[#4a4540] dark:text-[#c5c0b8] mb-3">
             グループアイコン
           </p>
           <div className="flex items-center gap-4">
             <GroupAvatar name={name || "グループ"} color={color} iconUrl={iconUrl} size={56} />
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className="px-3 py-2 rounded-lg text-sm font-semibold text-white bg-[#c9a227]"
-              >
+              <Button rounded small onClick={() => fileRef.current?.click()}>
                 画像を選択
-              </button>
+              </Button>
               {iconUrl && (
-                <button
-                  type="button"
+                <Button
+                  rounded
+                  small
+                  outline
                   onClick={() => {
                     setIconUrl(undefined);
                     if (fileRef.current) fileRef.current.value = "";
                   }}
-                  className="px-3 py-2 rounded-lg text-sm font-semibold border border-[#e5e0d8] dark:border-[#333230]"
                 >
                   削除
-                </button>
+                </Button>
               )}
             </div>
           </div>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleIconChange} />
-        </div>
+        </Card>
         <ColorPalette value={color} onChange={setColor} />
         <PrimaryButton onClick={handleSave} loading={loading}>
           保存
         </PrimaryButton>
 
-        <div className="border-t border-[#e5e0d8] dark:border-[#333230] pt-5 flex flex-col gap-4">
+        <div className="border-t border-[var(--color-separator)] pt-5 flex flex-col gap-4">
           <h2 className="text-lg font-bold text-[#2d2a26] dark:text-[#eae7e1]">
             メンバー招待
           </h2>
@@ -235,57 +225,55 @@ export default function GroupSettingsPage() {
               招待リンクを作成
             </PrimaryButton>
             {newInviteUrl && (
-              <div className="flex items-center gap-2 rounded-xl border border-[#e5e0d8] dark:border-[#333230] p-3">
-                <span className="flex-1 text-xs text-[#4a4540] dark:text-[#c5c0b8] truncate">
-                  {newInviteUrl}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleCopyInvite(newInviteUrl)}
-                  className="shrink-0 px-3 py-1 rounded-lg text-xs font-semibold text-white bg-[#c9a227]"
-                >
-                  コピー
-                </button>
-              </div>
+              <Card contentWrapPadding="p-3">
+                <div className="flex items-center gap-2">
+                  <span className="flex-1 text-xs text-[#4a4540] dark:text-[#c5c0b8] truncate">
+                    {newInviteUrl}
+                  </span>
+                  <Button small rounded onClick={() => handleCopyInvite(newInviteUrl)}>
+                    コピー
+                  </Button>
+                </div>
+              </Card>
             )}
             {invitations.length > 0 && (
               <div className="flex flex-col gap-2">
                 <p className="text-xs font-medium text-[#7a756d] dark:text-[#9e9a93]">
                   有効な招待リンク
                 </p>
-                {invitations.map((inv) => (
-                  <div
-                    key={inv.id}
-                    className="flex items-center justify-between rounded-xl border border-[#e5e0d8] dark:border-[#333230] p-3 gap-2"
-                  >
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-xs text-[#4a4540] dark:text-[#c5c0b8] truncate">
-                        {inv.url}
-                      </span>
-                      {inv.expiresAt && (
-                        <span className="text-xs text-[#7a756d] dark:text-[#9e9a93]">
-                          {new Date(inv.expiresAt).toLocaleDateString("ja-JP")} まで有効
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => handleCopyInvite(inv.url)}
-                        className="px-2 py-1 rounded-lg text-xs font-semibold border border-[#e5e0d8] dark:border-[#333230]"
-                      >
-                        コピー
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRevoke(inv.id)}
-                        className="text-xs text-red-500 underline"
-                      >
-                        無効化
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                <List strongIos insetIos className="my-0">
+                  {invitations.map((inv) => (
+                    <ListItem
+                      key={inv.id}
+                      title={inv.url}
+                      titleWrapClassName="min-w-0"
+                      innerClassName="items-center"
+                      subtitle={
+                        inv.expiresAt
+                          ? `${new Date(inv.expiresAt).toLocaleDateString("ja-JP")} まで有効`
+                          : undefined
+                      }
+                      after={
+                        <div className="flex items-center gap-3 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyInvite(inv.url)}
+                            className="text-xs font-semibold text-primary"
+                          >
+                            コピー
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRevoke(inv.id)}
+                            className="text-xs text-red-500"
+                          >
+                            無効化
+                          </button>
+                        </div>
+                      }
+                    />
+                  ))}
+                </List>
               </div>
             )}
           </div>
@@ -310,34 +298,34 @@ export default function GroupSettingsPage() {
           <h2 className="text-lg font-bold text-[#2d2a26] dark:text-[#eae7e1] mb-2">
             メンバー一覧
           </h2>
-          <div className="flex flex-col gap-2">
+          <List strongIos insetIos className="my-0">
             {group.members.map((m) => (
-              <div
+              <ListItem
                 key={m.id}
-                className="flex items-center justify-between rounded-xl p-3 border border-[#e5e0d8] dark:border-[#333230]"
-              >
-                <span className="text-sm text-[#2d2a26] dark:text-[#eae7e1]">
-                  {m.name} {m.role ? `(${m.role})` : ""}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleRemove(m.id)}
-                  className="text-xs text-red-500 underline"
-                >
-                  除外
-                </button>
-              </div>
+                title={`${m.name}${m.role ? `（${m.role}）` : ""}`}
+                after={
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(m.id)}
+                    className="text-xs text-red-500"
+                  >
+                    除外
+                  </button>
+                }
+              />
             ))}
-          </div>
+          </List>
         </div>
 
-        <button
-          type="button"
+        <Button
+          large
+          rounded
+          outline
           onClick={handleDelete}
-          className="w-full h-12 rounded-xl border border-red-400 text-red-500 font-semibold"
+          className="!text-red-500 !border-red-400"
         >
           グループを削除
-        </button>
+        </Button>
       </PageTransition>
       <BottomNav />
     </ScreenContainer>

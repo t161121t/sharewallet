@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Dancing_Script } from "next/font/google";
 import { Toaster } from "react-hot-toast";
+import ThemeSync from "@/components/layout/ThemeSync";
+import KonstaProvider from "@/components/layout/KonstaProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -33,7 +35,8 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${dancingScript.variable} antialiased`}
       >
-        {children}
+        <ThemeSync />
+        <KonstaProvider>{children}</KonstaProvider>
         <Toaster
           position="top-center"
           toastOptions={{

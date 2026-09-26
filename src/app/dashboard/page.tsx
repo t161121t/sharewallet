@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Button, Segmented, SegmentedButton } from "konsta/react";
 import ScreenContainer from "@/components/layout/ScreenContainer";
 import PageTransition from "@/components/layout/PageTransition";
+import Header from "@/components/layout/Header";
 import BottomNav from "@/components/layout/BottomNav";
 import RouteLoading from "@/components/layout/RouteLoading";
-import Logo from "@/components/ui/Logo";
 import CategoryIcon from "@/components/icons/CategoryIcon";
 import GroupAvatar from "@/components/ui/GroupAvatar";
 import type { CategoryName, DashboardSummary, Group } from "@/types";
@@ -119,45 +119,27 @@ export default function DashboardPage() {
   if (!isReady) return <RouteLoading text="グループを読み込み中..." withBottomNav />;
 
   return (
-    <ScreenContainer>
+    <ScreenContainer header={<Header title="ホーム" large />}>
       <PageTransition className="flex flex-col items-center w-full flex-1 pb-20">
-        <div className="pt-2 pb-6">
-          <Logo size={100} showScriptText={true} />
-        </div>
-
-        <h1 className="text-xl font-bold text-[#2d2a26] dark:text-[#eae7e1] w-full">
-          ホーム
-        </h1>
         <p className="text-sm text-[#7a756d] dark:text-[#9e9a93] w-full mt-1 mb-5">
           {summary?.period.label ?? "今月"}のあなたの支出を確認できます
         </p>
 
-        <div className="w-full rounded-2xl bg-white/80 dark:bg-[#1c1b19]/80 border border-[#ece7de] dark:border-[#2f2d2a] p-1 mb-4">
-          <div className="grid grid-cols-3 gap-1">
-            {[
-              { key: "overview", label: "全体" },
-              { key: "groups", label: "グループ" },
-              { key: "categories", label: "ジャンル" },
-            ].map((tab) => {
-              const isActive = activeTab === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setActiveTab(tab.key as DashboardTab)}
-                  className={[
-                    "h-9 rounded-xl text-sm font-semibold transition-colors",
-                    isActive
-                      ? "bg-[#c9a227] text-white"
-                      : "text-[#7a756d] dark:text-[#9e9a93] hover:bg-[#f6f2ea] dark:hover:bg-[#2b2926]",
-                  ].join(" ")}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <Segmented strong rounded className="w-full mb-4">
+          {[
+            { key: "overview", label: "全体" },
+            { key: "groups", label: "グループ" },
+            { key: "categories", label: "ジャンル" },
+          ].map((tab) => (
+            <SegmentedButton
+              key={tab.key}
+              active={activeTab === tab.key}
+              onClick={() => setActiveTab(tab.key as DashboardTab)}
+            >
+              {tab.label}
+            </SegmentedButton>
+          ))}
+        </Segmented>
 
         {summaryError && (
           <div className="w-full mb-4 rounded-xl border border-[#f1ddd6] dark:border-[#4a2d24] bg-[#fff7f4] dark:bg-[#2b1d18] px-4 py-3 text-sm text-[#a04b36] dark:text-[#f1b29f]">
@@ -201,7 +183,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl border border-[#dfd7c9] dark:border-[#3a3732] bg-white dark:bg-[#1f1d1a] p-4">
+              <div className="rounded-xl border border-[var(--color-separator)] bg-white dark:bg-[#1f1d1a] p-4">
                 <p className="text-xs text-[#6f6a62] dark:text-[#b1aba2]">支出が多いグループ</p>
                 <p className="text-sm font-semibold text-[#2d2a26] dark:text-[#eae7e1] mt-1 truncate">
                   {topGroup?.groupName ?? "データなし"}
@@ -210,7 +192,7 @@ export default function DashboardPage() {
                   {formatYen(topGroup?.amount ?? 0)}
                 </p>
               </div>
-              <div className="rounded-xl border border-[#dfd7c9] dark:border-[#3a3732] bg-white dark:bg-[#1f1d1a] p-4">
+              <div className="rounded-xl border border-[var(--color-separator)] bg-white dark:bg-[#1f1d1a] p-4">
                 <p className="text-xs text-[#6f6a62] dark:text-[#b1aba2]">支出が多いジャンル</p>
                 <p className="text-sm font-semibold text-[#2d2a26] dark:text-[#eae7e1] mt-1 truncate">
                   {topCategory?.category ?? "データなし"}
@@ -222,7 +204,7 @@ export default function DashboardPage() {
             </div>
 
             {top3Categories.length > 0 && (
-              <div className="rounded-xl border border-[#dfd7c9] dark:border-[#3a3732] bg-white dark:bg-[#1f1d1a] p-4">
+              <div className="rounded-xl border border-[var(--color-separator)] bg-white dark:bg-[#1f1d1a] p-4">
                 <p className="text-xs text-[#6f6a62] dark:text-[#b1aba2] mb-2">TOP3ジャンル</p>
                 <div className="flex gap-2 flex-wrap">
                   {top3Categories.map((c, i) => (
@@ -249,7 +231,7 @@ export default function DashboardPage() {
           <div className="w-full flex flex-col gap-3 mb-5">
             {summary?.byGroup.length ? (
               <>
-                <div className="rounded-2xl p-4 border border-[#ece7de] dark:border-[#2f2d2a] bg-gradient-to-br from-[#fff8ea] to-[#f7edd6] dark:from-[#2a261f] dark:to-[#1f1c17] shadow-sm">
+                <div className="rounded-2xl p-4 border border-[var(--color-separator)] bg-gradient-to-br from-[#fff8ea] to-[#f7edd6] dark:from-[#2a261f] dark:to-[#1f1c17] shadow-sm">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold text-[#9e9a93] dark:text-[#9b968f] tracking-wide">
@@ -356,7 +338,7 @@ export default function DashboardPage() {
                 })}
               </>
             ) : (
-              <div className="rounded-2xl border border-dashed border-[#ddd6c8] dark:border-[#3c3a36] px-5 py-10 text-center">
+              <div className="rounded-2xl border border-dashed border-[var(--color-separator)] px-5 py-10 text-center">
                 <p className="text-4xl mb-3">👛</p>
                 <p className="text-sm font-medium text-[#8c867d] dark:text-[#8f8a84]">
                   今月のグループ支出はまだありません
@@ -455,7 +437,7 @@ export default function DashboardPage() {
                 })}
               </>
             ) : (
-              <div className="rounded-2xl border border-dashed border-[#ddd6c8] dark:border-[#3c3a36] px-5 py-10 text-center">
+              <div className="rounded-2xl border border-dashed border-[var(--color-separator)] px-5 py-10 text-center">
                 <p className="text-4xl mb-3">📊</p>
                 <p className="text-sm font-medium text-[#8c867d] dark:text-[#8f8a84]">
                   今月のジャンル支出はまだありません
@@ -470,12 +452,9 @@ export default function DashboardPage() {
 
         {activeTab !== "categories" && (
           <div className="w-full mb-4">
-            <Link
-              href="/groups/new"
-              className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white bg-[#c9a227] hover:brightness-105"
-            >
+            <Button rounded href="/groups/new" inline className="px-4">
               + グループ作成
-            </Link>
+            </Button>
           </div>
         )}
       </PageTransition>
