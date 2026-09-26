@@ -107,6 +107,24 @@ export async function POST(
         { status: 400 }
       );
     }
+    let expenseDate = new Date();
+    if (body.date !== undefined) {
+      if (typeof body.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
+        return NextResponse.json<ApiError>(
+          { error: "日付はYYYY-MM-DD形式で指定してください" },
+          { status: 400 }
+        );
+      }
+      const parsedDate = new Date(`${body.date}T12:00:00.000Z`);
+      if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== body.date) {
+        return NextResponse.json<ApiError>(
+          { error: "正しい日付を指定してください" },
+          { status: 400 }
+        );
+      }
+      // UTC正午にすると、実行環境の時差によって日付が前後しにくい。
+      expenseDate = parsedDate;
+    }
 
     const expense = await prisma.expense.create({
       data: {
@@ -115,7 +133,7 @@ export async function POST(
         category: body.category,
         amount: body.amount,
         memo: body.memo ?? null,
-        date: new Date(),
+        date: expenseDate,
         shares: {
           create: incomingShares.map((s) => ({
             userId: s.userId,

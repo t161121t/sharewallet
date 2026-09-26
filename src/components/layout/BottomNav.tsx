@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Tabbar, TabbarLink } from "konsta/react";
-import { Home, SquarePlus, ScrollText, CircleUserRound } from "lucide-react";
+import { Home, SquarePlus, ScrollText, ChartColumn, CircleUserRound } from "lucide-react";
 import MemberAvatar from "@/components/ui/MemberAvatar";
 import { getCachedUser } from "@/lib/apiClient";
 
@@ -33,6 +33,11 @@ const STATIC_ITEMS: NavItem[] = [
     href: "/expense/history",
     label: "詳細",
     icon: (active) => <ScrollText size={ICON_SIZE} strokeWidth={active ? 2.25 : 1.75} />,
+  },
+  {
+    href: "/analysis",
+    label: "分析",
+    icon: (active) => <ChartColumn size={ICON_SIZE} strokeWidth={active ? 2.25 : 1.75} />,
   },
 ];
 

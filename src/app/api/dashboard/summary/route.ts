@@ -8,6 +8,7 @@ import type {
 } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { requireAuthUserId } from "@/lib/auth";
+import { getDashboardPeriod, zonedStartOfDay } from "@/lib/dashboardTime";
 
 function normalizeCategory(category: string): CategoryName {
   if (category === "交通費") return "交通";
@@ -22,15 +23,18 @@ function normalizeCategory(category: string): CategoryName {
   return "その他";
 }
 
-/** GET /api/dashboard/summary - ホーム表示用の今月集計 */
+/** GET /api/dashboard/summary?year=2026&month=9 - 指定月の個人支出集計 */
 export async function GET(req: NextRequest) {
   try {
     const userId = await requireAuthUserId(req);
-    const now = new Date();
-    const periodFrom = new Date(now.getFullYear(), now.getMonth(), 1);
-    const periodTo = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    const prevFrom = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const prevTo = new Date(now.getFullYear(), now.getMonth(), 1);
+    const period = getDashboardPeriod(req.nextUrl.searchParams);
+    if (!period) {
+      return NextResponse.json<ApiError>({ error: "year は2000〜2100、month は1〜12で指定してください" }, { status: 400 });
+    }
+    const { year, month, from: periodFrom, to: periodTo, timeZone } = period;
+    const previous = new Date(year, month - 2, 1);
+    const prevFrom = zonedStartOfDay(previous.getFullYear(), previous.getMonth() + 1, 1, timeZone);
+    const prevTo = periodFrom;
 
     const expenses = await prisma.expense.findMany({
       where: {
@@ -111,7 +115,7 @@ export async function GET(req: NextRequest) {
       period: {
         from: periodFrom.toISOString(),
         to: periodTo.toISOString(),
-        label: "今月",
+        label: `${year}年${month}月`,
       },
     };
 
