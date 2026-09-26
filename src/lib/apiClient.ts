@@ -16,6 +16,8 @@ import type {
   CategoryName,
   ExpenseShare,
   DashboardSummary,
+  DashboardCalendar,
+  DashboardTrend,
   SettlementResult,
   ReceiptAnalysisResult,
 } from "@/types";
@@ -312,8 +314,25 @@ export async function getExpenses(groupId: string): Promise<ExpenseRecord[]> {
   return apiFetch<ExpenseRecord[]>(`/api/groups/${groupId}/expenses`);
 }
 
-export async function getDashboardSummary(): Promise<DashboardSummary> {
-  return apiFetch<DashboardSummary>("/api/dashboard/summary");
+function dashboardQuery(year?: number, month?: number) {
+  const params = new URLSearchParams();
+  if (year && month) { params.set("year", String(year)); params.set("month", String(month)); }
+  if (typeof window !== "undefined") params.set("timeZone", Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export async function getDashboardSummary(year?: number, month?: number): Promise<DashboardSummary> {
+  const query = dashboardQuery(year, month);
+  return apiFetch<DashboardSummary>(`/api/dashboard/summary${query}`);
+}
+
+export async function getDashboardCalendar(year: number, month: number): Promise<DashboardCalendar> {
+  return apiFetch<DashboardCalendar>(`/api/dashboard/calendar${dashboardQuery(year, month)}`);
+}
+
+export async function getDashboardTrend(year: number, month: number): Promise<DashboardTrend> {
+  return apiFetch<DashboardTrend>(`/api/dashboard/trend${dashboardQuery(year, month)}`);
 }
 
 export async function createExpense(
@@ -324,6 +343,8 @@ export async function createExpense(
     memberId?: string;
     memberName?: string;
     memo?: string;
+    /** YYYY-MM-DD。省略時は登録時刻を使う */
+    date?: string;
     shares?: ExpenseShare[];
   }
 ): Promise<ExpenseRecord> {
