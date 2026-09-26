@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import ScreenContainer from "@/components/layout/ScreenContainer";
@@ -8,36 +8,20 @@ import PageTransition from "@/components/layout/PageTransition";
 import BottomNav from "@/components/layout/BottomNav";
 import RouteLoading from "@/components/layout/RouteLoading";
 import GroupBanner from "@/components/ui/GroupBanner";
-import ExpensePieChart, { type ExpenseCategory } from "@/components/ui/ExpensePieChart";
 import GenreSelect from "@/components/ui/GenreSelect";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import MemberAvatar from "@/components/ui/MemberAvatar";
-import type { Group, CategoryName, ExpenseRecord } from "@/types";
+import type { Group, CategoryName } from "@/types";
 import {
   isAuthenticated,
   getGroups,
   getSelectedGroupId,
   setSelectedGroupId,
   getGroup,
-  getExpenses,
   createExpense,
   analyzeReceipt,
   ApiClientError,
 } from "@/lib/apiClient";
-
-const CATEGORY_COLORS: Record<CategoryName, string> = {
-  貯金: "#22c55e",
-  住居: "#f97316",
-  交通: "#38bdf8",
-  食費: "#ef4444",
-  娯楽: "#8b5cf6",
-  医療: "#ec4899",
-  日用品: "#f59e0b",
-  通信: "#06b6d4",
-  美容: "#e879f9",
-  教育: "#6366f1",
-  その他: "#94a3b8",
-};
 
 function normalizeCategory(category: string): CategoryName {
   if (category === "交通費") return "交通";
@@ -102,31 +86,13 @@ export default function ExpensePage() {
   const [switchingGroup, setSwitchingGroup] = useState(false);
   const [group, setGroup] = useState<Group | null>(null);
   const [myGroups, setMyGroups] = useState<Group[]>([]);
-  const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const [shares, setShares] = useState<Record<string, string>>({});
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
 
-  const pieData = useMemo<ExpenseCategory[]>(() => {
-    const sumByCategory: Record<CategoryName, number> = {
-      貯金: 0, 住居: 0, 交通: 0, 食費: 0, 娯楽: 0,
-      医療: 0, 日用品: 0, 通信: 0, 美容: 0, 教育: 0, その他: 0,
-    };
-    for (const e of expenses) {
-      const normalized = normalizeCategory(e.category);
-      sumByCategory[normalized] += e.amount;
-    }
-    return (Object.keys(sumByCategory) as CategoryName[]).map((category) => ({
-      name: category,
-      value: sumByCategory[category],
-      color: CATEGORY_COLORS[category],
-    }));
-  }, [expenses]);
-
   const loadGroupData = async (groupId: string, withSwitchLoading = false) => {
     if (withSwitchLoading) setSwitchingGroup(true);
-    const [groupData, expensesData] = await Promise.all([getGroup(groupId), getExpenses(groupId)]);
+    const groupData = await getGroup(groupId);
     setGroup(groupData);
-    setExpenses(expensesData);
     const n = groupData.members.length;
     const base = Math.floor(100 / n / 10) * 10;
     const extra = (100 - base * n) / 10;
@@ -224,14 +190,13 @@ export default function ExpensePage() {
 
     setLoading(true);
     try {
-      const created = await createExpense(group.id, {
+      await createExpense(group.id, {
         category: normalizeCategory(genre),
         amount: Number(amount),
         memo: memo || undefined,
         date: expenseDate,
         shares: shareItems,
       });
-      setExpenses((prev) => [created, ...prev]);
       toast.success("支出を登録しました");
       setGenre("");
       setAmount("");
@@ -375,11 +340,6 @@ export default function ExpensePage() {
             </button>
           </div>
         )}
-
-        {/* 円グラフ + 凡例 */}
-        <div className="w-full mt-3">
-          <ExpensePieChart size={200} data={pieData} />
-        </div>
 
         {/* 入力フォーム */}
         <fieldset disabled={isFormDisabled} className="flex flex-col gap-4 w-full mt-5 disabled:opacity-60">
