@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import { Button, Sheet } from "konsta/react";
+import { Pencil, Trash2 } from "lucide-react";
 import ScreenContainer from "@/components/layout/ScreenContainer";
 import PageTransition from "@/components/layout/PageTransition";
 import Header from "@/components/layout/Header";
@@ -12,6 +13,7 @@ import BottomNav from "@/components/layout/BottomNav";
 import RouteLoading from "@/components/layout/RouteLoading";
 import CategoryIcon from "@/components/icons/CategoryIcon";
 import GroupAvatar from "@/components/ui/GroupAvatar";
+import GenreSelect from "@/components/ui/GenreSelect";
 import TextInput from "@/components/ui/TextInput";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import type { Group, ExpenseRecord, CategoryName } from "@/types";
@@ -170,33 +172,31 @@ function ExpenseItem({
         </div>
       </div>
 
-      <span className="text-base font-bold text-[#2d2a26] dark:text-[#eae7e1] tabular-nums shrink-0">
-        ¥{expense.amount.toLocaleString()}
-      </span>
-      <button
-        type="button"
-        onClick={() => onEdit(expense)}
-        disabled={!canEdit}
-        className={[
-          "text-xs underline",
-          canEdit
-            ? "text-[#7a756d] dark:text-[#9e9a93]"
-            : "text-[#b5b0a8] dark:text-[#666360] cursor-not-allowed",
-        ].join(" ")}
-      >
-        編集
-      </button>
-      <button
-        type="button"
-        onClick={() => onDelete(expense.id)}
-        disabled={!canEdit}
-        className={[
-          "text-xs underline",
-          canEdit ? "text-red-500" : "text-red-300 dark:text-red-800 cursor-not-allowed",
-        ].join(" ")}
-      >
-        削除
-      </button>
+      <div className="flex items-center gap-1 shrink-0">
+        <span className="text-base font-bold text-[#2d2a26] dark:text-[#eae7e1] tabular-nums mr-1">
+          ¥{expense.amount.toLocaleString()}
+        </span>
+        {canEdit && (
+          <>
+            <button
+              type="button"
+              onClick={() => onEdit(expense)}
+              aria-label="この支出を編集"
+              className="w-9 h-9 grid place-items-center rounded-full text-[#7a756d] dark:text-[#9e9a93] active:bg-black/5 dark:active:bg-white/10"
+            >
+              <Pencil size={17} strokeWidth={1.75} />
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(expense.id)}
+              aria-label="この支出を削除"
+              className="w-9 h-9 grid place-items-center rounded-full text-red-500 active:bg-red-50 dark:active:bg-red-950/30"
+            >
+              <Trash2 size={17} strokeWidth={1.75} />
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -209,8 +209,11 @@ export default function HistoryPage() {
   const [group, setGroup] = useState<Group | null>(null);
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const [editing, setEditing] = useState<ExpenseRecord | null>(null);
+  const [editCategory, setEditCategory] = useState("");
   const [editMemo, setEditMemo] = useState("");
   const [editAmount, setEditAmount] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [canManageAll, setCanManageAll] = useState(false);
 
@@ -273,22 +276,33 @@ export default function HistoryPage() {
       return;
     }
     setEditing(expense);
+    setEditCategory(expense.category);
     setEditMemo(expense.memo ?? "");
     setEditAmount(String(expense.amount));
+    setEditDate(expense.date.slice(0, 10));
   };
 
   const saveEdit = async () => {
     if (!editing) return;
+    if (!editCategory || !editAmount || !editDate) {
+      toast.error("ジャンル・金額・使った日を入力してください");
+      return;
+    }
+    setSavingEdit(true);
     try {
       const updated = await updateExpense(groupId, editing.id, {
+        category: editCategory as ExpenseRecord["category"],
         memo: editMemo,
         amount: Number(editAmount),
+        date: editDate,
       });
       setExpenses((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
       setEditing(null);
       toast.success("更新しました");
     } catch (e) {
       toast.error(e instanceof ApiClientError ? e.message : "更新に失敗しました");
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -350,9 +364,11 @@ export default function HistoryPage() {
         >
           <div className="p-5 flex flex-col gap-4">
             <h3 className="text-lg font-bold text-[#2d2a26] dark:text-[#eae7e1]">支出を編集</h3>
-            <TextInput label="メモ" value={editMemo} onChange={setEditMemo} />
+            <GenreSelect value={editCategory} onChange={setEditCategory} />
             <TextInput label="金額" type="number" value={editAmount} onChange={setEditAmount} />
-            <PrimaryButton onClick={saveEdit}>変更を保存</PrimaryButton>
+            <TextInput label="使った日" type="date" value={editDate} onChange={setEditDate} />
+            <TextInput label="メモ" value={editMemo} onChange={setEditMemo} />
+            <PrimaryButton onClick={saveEdit} loading={savingEdit}>変更を保存</PrimaryButton>
             <Button clear rounded onClick={() => setEditing(null)}>
               キャンセル
             </Button>

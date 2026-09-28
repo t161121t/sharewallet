@@ -24,3 +24,20 @@ export function isPasswordLongEnough(raw: string): boolean {
 export function isPasswordWithinBcryptLimit(raw: string): boolean {
   return new TextEncoder().encode(normalizePassword(raw)).length <= MAX_PASSWORD_BYTES;
 }
+
+/**
+ * "YYYY-MM-DD" 形式の支出日付文字列を検証し、UTC正午のDateへ変換する。
+ * 不正な形式・実在しない日付(例: 2月30日)の場合は null を返す。
+ *
+ * 支出の作成(POST /api/groups/:groupId/expenses)と編集
+ * (PUT /api/groups/:groupId/expenses/:expenseId)の両方で同じ形式・同じ
+ * 実在チェックを行う必要があるため、ここに1つだけ実装を置く。片方だけ
+ * チェックを緩めたり厳しくしたりすると、作成時は通るのに編集時は弾かれる
+ * (またはその逆)という不整合が起きる。
+ */
+export function parseExpenseDate(raw: string): Date | null {
+  if (typeof raw !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+  const parsed = new Date(`${raw}T12:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== raw) return null;
+  return parsed;
+}

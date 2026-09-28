@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { ApiError, ExpenseRecord } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { assertGroupMember, assertGroupRole, requireAuthUserId } from "@/lib/auth";
+import { parseExpenseDate } from "@/lib/validation";
 import { GroupRole } from "@/generated/prisma/client";
 
 export async function PUT(
@@ -35,6 +36,18 @@ export async function PUT(
       await assertGroupRole(groupId, userId, [GroupRole.OWNER, GroupRole.ADMIN]);
     }
 
+    let expenseDate: Date | undefined;
+    if (body.date !== undefined) {
+      const parsedDate = parseExpenseDate(body.date);
+      if (!parsedDate) {
+        return NextResponse.json<ApiError>(
+          { error: "日付はYYYY-MM-DD形式で正しく指定してください" },
+          { status: 400 }
+        );
+      }
+      expenseDate = parsedDate;
+    }
+
     const shares = Array.isArray(body.shares) ? body.shares : null;
     const updated = await prisma.expense.update({
       where: { id: expenseId },
@@ -43,6 +56,7 @@ export async function PUT(
         ...(body.amount !== undefined && { amount: Number(body.amount) }),
         ...(body.memo !== undefined && { memo: body.memo }),
         ...(body.memberId !== undefined && { memberId: body.memberId }),
+        ...(expenseDate && { date: expenseDate }),
         ...(shares && {
           shares: {
             deleteMany: {},

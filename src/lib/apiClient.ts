@@ -362,6 +362,7 @@ export async function updateExpense(
     amount: number;
     memberId: string;
     memo: string;
+    date: string;
     shares: ExpenseShare[];
   }>
 ): Promise<ExpenseRecord> {
