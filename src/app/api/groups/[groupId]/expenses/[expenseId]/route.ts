@@ -35,6 +35,24 @@ export async function PUT(
       await assertGroupRole(groupId, userId, [GroupRole.OWNER, GroupRole.ADMIN]);
     }
 
+    let expenseDate: Date | undefined;
+    if (body.date !== undefined) {
+      if (typeof body.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
+        return NextResponse.json<ApiError>(
+          { error: "日付はYYYY-MM-DD形式で指定してください" },
+          { status: 400 }
+        );
+      }
+      const parsedDate = new Date(`${body.date}T12:00:00.000Z`);
+      if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== body.date) {
+        return NextResponse.json<ApiError>(
+          { error: "正しい日付を指定してください" },
+          { status: 400 }
+        );
+      }
+      expenseDate = parsedDate;
+    }
+
     const shares = Array.isArray(body.shares) ? body.shares : null;
     const updated = await prisma.expense.update({
       where: { id: expenseId },
@@ -43,6 +61,7 @@ export async function PUT(
         ...(body.amount !== undefined && { amount: Number(body.amount) }),
         ...(body.memo !== undefined && { memo: body.memo }),
         ...(body.memberId !== undefined && { memberId: body.memberId }),
+        ...(expenseDate && { date: expenseDate }),
         ...(shares && {
           shares: {
             deleteMany: {},

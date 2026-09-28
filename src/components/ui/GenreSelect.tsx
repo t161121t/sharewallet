@@ -29,10 +29,10 @@ export default function GenreSelect({ value, onChange }: GenreSelectProps) {
         onChange={(e) => onChange(e.target.value)}
         className={[
           "w-full h-13 rounded-xl px-4 outline-none appearance-none cursor-pointer text-base",
-          "bg-white dark:bg-[#1c1b19] border border-[#e5e0d8] dark:border-[#333230]",
+          "bg-black/[0.04] dark:bg-white/10",
           "text-[#2d2a26] dark:text-[#eae7e1]",
           "transition-all duration-200 ease-out",
-          "focus:ring-2 focus:ring-[#c9a227] focus:border-[#c9a227]",
+          "focus:ring-2 focus:ring-primary",
         ].join(" ")}
         aria-label="ジャンルを選択"
       >
