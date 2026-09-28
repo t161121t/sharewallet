@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { ApiError, ExpenseRecord } from "@/types";
 import { prisma } from "@/lib/prisma";
 import { assertGroupMember, assertGroupRole, requireAuthUserId } from "@/lib/auth";
+import { parseExpenseDate } from "@/lib/validation";
 import { GroupRole } from "@/generated/prisma/client";
 
 export async function PUT(
@@ -37,16 +38,10 @@ export async function PUT(
 
     let expenseDate: Date | undefined;
     if (body.date !== undefined) {
-      if (typeof body.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
+      const parsedDate = parseExpenseDate(body.date);
+      if (!parsedDate) {
         return NextResponse.json<ApiError>(
-          { error: "日付はYYYY-MM-DD形式で指定してください" },
-          { status: 400 }
-        );
-      }
-      const parsedDate = new Date(`${body.date}T12:00:00.000Z`);
-      if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== body.date) {
-        return NextResponse.json<ApiError>(
-          { error: "正しい日付を指定してください" },
+          { error: "日付はYYYY-MM-DD形式で正しく指定してください" },
           { status: 400 }
         );
       }

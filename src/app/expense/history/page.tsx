@@ -284,8 +284,8 @@ export default function HistoryPage() {
 
   const saveEdit = async () => {
     if (!editing) return;
-    if (!editCategory || !editAmount) {
-      toast.error("ジャンルと金額を入力してください");
+    if (!editCategory || !editAmount || !editDate) {
+      toast.error("ジャンル・金額・使った日を入力してください");
       return;
     }
     setSavingEdit(true);
