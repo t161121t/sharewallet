@@ -4,12 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
+import { Button } from "konsta/react";
 import ScreenContainer from "@/components/layout/ScreenContainer";
 import PageTransition from "@/components/layout/PageTransition";
+import Header from "@/components/layout/Header";
 import BottomNav from "@/components/layout/BottomNav";
 import RouteLoading from "@/components/layout/RouteLoading";
 import TextInput from "@/components/ui/TextInput";
 import PrimaryButton from "@/components/ui/PrimaryButton";
+import Card from "@/components/ui/Card";
 import type { UserProfile } from "@/types";
 import {
   isAuthenticated,
@@ -229,24 +232,13 @@ export default function ProfilePage() {
   if (!isReady) return <RouteLoading text="プロフィールを読み込み中..." withBottomNav />;
 
   return (
-    <ScreenContainer>
+    <ScreenContainer header={<Header title="マイページ" large />}>
       <PageTransition className="flex flex-col w-full flex-1 pb-24 gap-4">
-        <header className="pt-1">
-          <p
-            className="text-3xl text-[#2d2a26] dark:text-[#eae7e1] text-center"
-            style={{ fontFamily: "var(--font-dancing-script), cursive" }}
-          >
-            Share Wallet
-          </p>
-          <h1 className="text-xl font-bold text-[#2d2a26] dark:text-[#eae7e1] mt-3">
-            マイページ
-          </h1>
-          <p className="text-sm text-[#7a756d] dark:text-[#9e9a93] mt-1">
-            プロフィール情報をここで管理できます
-          </p>
-        </header>
+        <p className="text-sm text-[#7a756d] dark:text-[#9e9a93] -mt-1">
+          プロフィール情報をここで管理できます
+        </p>
 
-        <section className="w-full rounded-2xl border border-[#e5e0d8] dark:border-[#333230] bg-white/70 dark:bg-[#1a1917] p-5">
+        <Card contentWrapPadding="p-5">
           <div className="flex flex-col items-center">
             <button
               type="button"
@@ -295,9 +287,9 @@ export default function ProfilePage() {
               </button>
             )}
           </div>
-        </section>
+        </Card>
 
-        <section className="w-full rounded-2xl border border-[#e5e0d8] dark:border-[#333230] bg-white/70 dark:bg-[#1a1917] p-5">
+        <Card contentWrapPadding="p-5">
           <h2 className="text-base font-bold text-[#2d2a26] dark:text-[#eae7e1] mb-4">
             プロフィール編集
           </h2>
@@ -331,15 +323,15 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
-        </section>
+        </Card>
 
-        <section className="w-full rounded-2xl border border-[#e5e0d8] dark:border-[#333230] bg-white/70 dark:bg-[#1a1917] p-4">
+        <Card contentWrapPadding="p-4">
           <PrimaryButton onClick={handleSave} loading={saving}>
             保存する
           </PrimaryButton>
-        </section>
+        </Card>
 
-        <section className="w-full rounded-2xl border border-[#e5e0d8] dark:border-[#333230] bg-white/70 dark:bg-[#1a1917] p-5">
+        <Card contentWrapPadding="p-5">
           <h2 className="text-base font-bold text-[#2d2a26] dark:text-[#eae7e1] mb-4">
             パスワード変更
           </h2>
@@ -374,17 +366,19 @@ export default function ProfilePage() {
               パスワードを変更する
             </PrimaryButton>
           </div>
-        </section>
+        </Card>
 
-        <section className="w-full pt-1">
-          <button
-            type="button"
+        <div className="w-full pt-1">
+          <Button
+            large
+            rounded
+            outline
             onClick={handleLogout}
-            className="w-full h-12 rounded-xl border-2 border-red-300 dark:border-red-700 text-red-500 dark:text-red-400 font-semibold text-base hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors duration-150 active:scale-[0.98]"
+            className="h-12 text-base !text-red-500 dark:!text-red-400 !border-red-300 dark:!border-red-700"
           >
             ログアウト
-          </button>
-        </section>
+          </Button>
+        </div>
       </PageTransition>
 
       <BottomNav />

@@ -3,12 +3,15 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { Button } from "konsta/react";
 import ScreenContainer from "@/components/layout/ScreenContainer";
 import PageTransition from "@/components/layout/PageTransition";
+import Header from "@/components/layout/Header";
 import TextInput from "@/components/ui/TextInput";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import ColorPalette from "@/components/ui/ColorPalette";
 import GroupAvatar from "@/components/ui/GroupAvatar";
+import Card from "@/components/ui/Card";
 import { ApiClientError, createGroup, setSelectedGroupId } from "@/lib/apiClient";
 
 export default function NewGroupPage() {
@@ -75,47 +78,41 @@ export default function NewGroupPage() {
   };
 
   return (
-    <ScreenContainer>
+    <ScreenContainer header={<Header title="グループ作成" showBackButton />}>
       <PageTransition className="flex flex-col w-full gap-5">
-        <h1 className="text-2xl font-bold text-[#2d2a26] dark:text-[#eae7e1]">
-          グループ作成
-        </h1>
         <TextInput
           label="グループ名"
           placeholder="例: 旅行メンバー"
           value={name}
           onChange={setName}
         />
-        <div className="rounded-xl border border-[#e5e0d8] dark:border-[#333230] p-4">
+        <Card contentWrapPadding="p-4">
           <p className="text-base font-medium text-[#4a4540] dark:text-[#c5c0b8] mb-3">
             グループアイコン
           </p>
           <div className="flex items-center gap-4">
             <GroupAvatar name={name || "グループ"} color={color} iconUrl={iconUrl} size={56} />
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className="px-3 py-2 rounded-lg text-sm font-semibold text-white bg-[#c9a227]"
-              >
+              <Button rounded small onClick={() => fileRef.current?.click()}>
                 画像を選択
-              </button>
+              </Button>
               {iconUrl && (
-                <button
-                  type="button"
+                <Button
+                  rounded
+                  small
+                  outline
                   onClick={() => {
                     setIconUrl(undefined);
                     if (fileRef.current) fileRef.current.value = "";
                   }}
-                  className="px-3 py-2 rounded-lg text-sm font-semibold border border-[#e5e0d8] dark:border-[#333230]"
                 >
                   削除
-                </button>
+                </Button>
               )}
             </div>
           </div>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleIconChange} />
-        </div>
+        </Card>
         <ColorPalette value={color} onChange={setColor} />
         <PrimaryButton onClick={handleCreate} loading={loading}>
           作成する
